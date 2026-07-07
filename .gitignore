@@ -1,7 +1,29 @@
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
 .venv/
-.ipynb_checkpoints/
-data/
-models/
+venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# quantlab runtime artifacts
+.quantlab/
+results/
+*.log
+
+# Notebooks
+notebooks/.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
