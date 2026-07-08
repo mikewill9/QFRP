@@ -95,7 +95,7 @@ class MarketDataset:
     @property
     def index(self) -> pd.DatetimeIndex:
         """Shared date index."""
-        return self.close.index  # type: ignore[return-value]
+        return self.close.index
 
     @property
     def symbols(self) -> list[str]:

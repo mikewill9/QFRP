@@ -141,7 +141,9 @@ class DatasetStore:
         if not self.root.exists():
             return []
         names = [
-            str(p.parent.relative_to(self.root))
+            # as_posix() keeps names forward-slashed on every OS, matching
+            # the names accepted by save()/load().
+            p.parent.relative_to(self.root).as_posix()
             for p in self.root.rglob(_MANIFEST)
         ]
         return sorted(names)

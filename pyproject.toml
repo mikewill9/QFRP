@@ -79,7 +79,9 @@ ignore = [
 known-first-party = ["quantlab"]
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12 target: numpy >= 2.5 type stubs use `type` statements (PEP 695).
+# Runtime support remains 3.11+ (requires-python above).
+python_version = "3.12"
 packages = ["quantlab"]
 mypy_path = "src"
 ignore_missing_imports = true
