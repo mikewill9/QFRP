@@ -32,18 +32,26 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 5: ML alpha pipeline
+- Checkpoint 4: portfolio and risk layer
 - Checkpoint 3: backtesting engine
 - Checkpoint 2: research subsystem
 - Checkpoint 1: initial quantlab framework
-- Add gitignore
 
 Current HEAD:
 
-ef8e022 Checkpoint 3: backtesting engine
+0656e5b Checkpoint 5: ML alpha pipeline
 
 The repository is the source of truth.
 
 Do not rely on previous chat history.
+
+## Environment
+
+- Python 3.14 virtual environment at `.venv` (not committed)
+- Install with: `pip install -e ".[dev]"`
+- Validate with: `python -m pytest` (340 tests), `ruff check src tests examples`, `mypy`
+- Everything runs offline on the synthetic market; no downloads needed
 
 
 # Completed Work
@@ -68,191 +76,115 @@ This created the foundation for future research modules.
 
 Completed:
 
-### Factor Framework
-
-Implemented research factors including:
-
-- momentum
-- mean reversion
-- volatility
-- liquidity
-- statistical factors
-
-
-### Signal Framework
-
-Implemented:
-
-- signal generation
-- signal transformations
-- signal pipelines
-
-
-### Research Evaluation
-
-Implemented:
-
-- information coefficient analysis
-- rank IC
-- linear IC
-- quantile analysis
-- turnover analysis
-- signal evaluation
-
-
-### Experiment Tracking
-
-Implemented:
-
-- experiment recording
-- metric tracking
-- research artifacts
+- factor framework (momentum, mean reversion, volatility, liquidity, statistical)
+- signal generation, transformations, pipelines
+- research evaluation (IC analysis, quantile analysis, turnover)
+- experiment tracking
 
 
 ## Checkpoint 3: Backtesting Engine
 
 Completed:
 
-### Event-Driven Architecture
+- event-driven architecture (market, order, fill events)
+- execution simulation (costs, commission, slippage, fill timing)
+- portfolio accounting (positions, trades, equity)
+- performance analytics (returns, Sharpe, Sortino, drawdown, CAGR, turnover)
 
-Implemented:
-
-- market events
-- order events
-- fill events
-- event lifecycle
-
-
-### Execution Simulation
-
-Includes:
-
-- order handling
-- transaction costs
-- commission modeling
-- slippage modeling
-- fill timing assumptions
+Design goals: avoid lookahead bias, include realistic costs,
+separate research from execution, maintain test coverage.
 
 
-### Portfolio Accounting
+## Checkpoint 4: Portfolio and Risk Layer
 
-Implemented:
+Completed:
 
-- positions
-- trades
-- equity tracking
-- portfolio state
+### Portfolio (src/quantlab/portfolio/)
+
+- covariance: sample, EWMA, Ledoit-Wolf constant-correlation shrinkage
+- constraints: bounds/leverage/net caps with approximate projection
+  and exact SLSQP hooks
+- optimizers: inverse volatility, equal risk contribution,
+  mean-variance, max Sharpe, hierarchical risk parity,
+  volatility targeting wrapper
+- rebalancing: no-trade bands and turnover caps
+
+Optimizers raise on singular/ill-conditioned covariance rather than
+silently regularizing. Covariance is per-period; annualization happens
+at the point of use.
+
+### Risk (src/quantlab/risk/)
+
+- metrics: vol, VaR and Expected Shortfall (historical, normal,
+  Cornish-Fisher), beta
+- drawdowns: series, episode table, ulcer index
+- exposures: gross/net, sector, factor (OLS)
+- limits: declarative RiskLimit framework with RiskMonitor
+- reporting: RiskReport.from_backtest
 
 
-### Performance Analytics
+## Checkpoint 5: ML Alpha Pipeline
 
-Implemented:
+Completed (src/quantlab/ml/):
 
-- returns
-- Sharpe ratio
-- Sortino ratio
-- drawdown analysis
-- CAGR
-- turnover analysis
+- datasets: wide factors -> supervised (date, symbol) panel with
+  forward-return targets; the standard alignment is causal by
+  construction
+- validation: purged k-fold with embargo; walk-forward with a purge
+  gap defaulting to the label horizon (strictly past -> future)
+- models: ridge, random forest, gradient boosting (lightgbm optional,
+  chosen at fit time, never imported at module load), ensembles
+- training: walk-forward trainer producing an out-of-sample signal
+  wide frame plus per-fold audit table
+- evaluation: regression metrics, OOS rank IC (same IC machinery as
+  the research layer), permutation importance
+- persistence: versioned model registry with JSON manifests
 
-
-Important design goals:
-
-- avoid lookahead bias
-- include realistic costs
-- separate research from execution
-- maintain test coverage
+Note: analytics/attribution.py (architecture.md section 4.7) was
+deferred from Checkpoint 4 and remains unimplemented.
 
 
 # Current Development Stage
 
-## Checkpoint 4: Portfolio Construction + Risk Management
+## Checkpoint 6: Visualization + Analytics Attribution
 
 This is the next milestone.
 
-A previous Claude session began planning this stage, but those changes were NOT committed into the repository.
 
-The repository state is authoritative.
-
-Continue from the existing files, not previous chat output.
-
-
-# Portfolio Module
+# Visualization Module
 
 Expected location:
 
-src/quantlab/portfolio/
+src/quantlab/viz/
 
+Contracts are pinned in docs/architecture.md section 4.8.
 
 Expected components:
 
-- covariance.py
-- constraints.py
-- optimizers.py
-- rebalance.py
+- style.py: apply_style()
+- performance.py: plot_equity_and_drawdown, plot_rolling_stats,
+  plot_monthly_heatmap
+- factors.py: plot_ic, plot_quantile_returns, plot_factor_correlation
+- portfolio.py: plot_weights, plot_contributions
+- tearsheet.py: tearsheet(result) -> Figure
+
+Rules:
+
+- all functions accept and return matplotlib objects
+- nothing calls plt.show()
+- viz may import every other subsystem
 
 
-Potential functionality:
-
-## Covariance
-
-- sample covariance
-- exponentially weighted covariance
-- shrinkage methods
-- covariance validation
-
-
-## Constraints
-
-- position limits
-- leverage constraints
-- exposure constraints
-- portfolio rules
-
-
-## Optimizers
-
-Potential methods:
-
-- equal weighting
-- inverse volatility
-- risk parity
-- hierarchical risk parity
-- mean-variance optimization
-
-
-## Rebalancing
-
-Potential features:
-
-- rebalance schedules
-- turnover limits
-- no-trade bands
-- transaction-aware adjustments
-
-
-# Risk Module
+# Attribution Module
 
 Expected location:
 
-src/quantlab/risk/
+src/quantlab/analytics/attribution.py
 
+Contract is pinned in docs/architecture.md section 4.7:
 
-Expected components:
-
-- metrics.py
-- reporting.py
-
-
-Potential functionality:
-
-- volatility calculations
-- drawdown metrics
-- Value at Risk
-- Expected Shortfall
-- beta
-- exposure analysis
-- risk reports
+- asset_contributions(weights, asset_returns)
+- factor_attribution(returns, factor_returns) with alpha, betas, R^2
 
 
 # Development Rules
@@ -295,15 +227,14 @@ Before completing a checkpoint:
 
 Complete:
 
-1. Portfolio construction layer
+1. Visualization layer (style, performance, factors, portfolio, tearsheet)
 
-2. Risk management layer
+2. Analytics attribution
 
-3. Tests
+3. Tests (matplotlib figures can be tested headless via the Agg backend)
 
 4. Documentation
 
-
 Then create a Git checkpoint:
 
-Checkpoint 4: portfolio and risk layer
+Checkpoint 6: visualization and attribution
