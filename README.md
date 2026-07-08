@@ -147,9 +147,10 @@ mypy                        # type check
 The subsystems are being built in dependency order; `docs/architecture.md`
 pins the interfaces each layer exposes. Complete and tested: data
 infrastructure, factor research (factors, signals, evaluation, experiment
-tracking), the event-driven backtest engine, and performance analytics.
-Next in sequence: portfolio construction and risk, then the ML pipeline
-and visualization.
+tracking), the event-driven backtest engine, performance analytics,
+portfolio construction (covariance estimation, optimizers, constraints,
+rebalancing), and risk monitoring (tail metrics, drawdowns, exposures,
+limits, reporting). Next in sequence: the ML pipeline and visualization.
 
 ## Disclaimer
 

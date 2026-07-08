@@ -75,7 +75,7 @@ Rules:
   `resample_dataset`, `align_intersection`, `filter_universe`,
   `rolling_dollar_volume`.
 
-### 4.2 research
+### 4.2 research (complete)
 
 - `Factor` (ABC), module `research.factors.base`:
   `compute(dataset) -> WideFrame` of scores (higher = better),
@@ -111,7 +111,7 @@ Rules:
   `Run.log_frame(name, df)`, `Run.finish()`; content-addressed run ids;
   `tracker.runs()`, `tracker.compare(metric)`.
 
-### 4.3 backtest
+### 4.3 backtest (complete)
 
 - Events (`events.py`): `MarketEvent(timestamp)`, `OrderEvent`,
   `FillEvent(symbol, quantity, price, commission, slippage)`.
@@ -134,7 +134,7 @@ Rules:
   `positions`, `trades`, `costs_paid`, and `summary()` (delegates to
   analytics).
 
-### 4.4 portfolio
+### 4.4 portfolio (complete)
 
 - `covariance.py`: `sample_cov(returns)`, `ewma_cov(returns, halflife)`,
   `ledoit_wolf_cc(returns)` (shrinkage to constant-correlation target,
@@ -142,20 +142,33 @@ Rules:
 - `optimizers.py`: common interface
   `Optimizer.weights(mu, cov, prev_weights=None) -> pd.Series`:
   `InverseVolatility`, `EqualRiskContribution` (cyclical coordinate
-  descent), `MeanVariance(risk_aversion, constraints)`, `MaxSharpe`,
-  `HierarchicalRiskParity(linkage_method)`. `VolatilityTargeting(target)`
-  wraps any optimizer and scales to target ex-ante vol.
+  descent), `MeanVariance(risk_aversion, constraints)`, `MaxSharpe`
+  (tangency; returned gross exposure is `max_gross` if capped, else 1),
+  `HierarchicalRiskParity(linkage_method)`.
+  `VolatilityTargeting(optimizer, target, periods_per_year, max_leverage)`
+  wraps any optimizer and scales to target ex-ante annualized vol.
+  `mu` is per-period expected returns supplied by the caller; risk-based
+  optimizers ignore it. Optimizers that invert the covariance raise
+  `OptimizationError` on singular/ill-conditioned input rather than
+  silently regularizing.
 - `constraints.py`: `Constraints(long_only, max_weight, min_weight,
-  max_gross, max_net)` with `project(weights)` and optimizer hooks.
-- `rebalance.py`: `RebalancePolicy(band, max_turnover, partial)` mapping
-  `(current, target) -> traded weights`.
+  max_gross, max_net)` with `project(weights)` (approximate clip+rescale,
+  used after heuristic optimizers), `is_satisfied(weights)`, and SLSQP
+  hooks `scipy_bounds(n)` / `scipy_constraints()` (exact, used by the
+  solver-based optimizers).
+- `rebalance.py`: `RebalancePolicy(band, max_turnover, partial)` with
+  `apply(current, target) -> traded-to weights` (per-asset no-trade bands,
+  pro-rata or all-or-nothing one-way turnover cap) and
+  `turnover(current, target)`.
 
-### 4.5 risk
+### 4.5 risk (complete)
 
 - `metrics.py`: `annualized_vol`, `rolling_vol`, `value_at_risk`
-  (`historical|normal|cornish_fisher`), `expected_shortfall`, `beta`.
+  (`historical|normal|cornish_fisher`), `expected_shortfall` (same three
+  methods), `beta`. VaR/ES are positive loss fractions.
 - `drawdown.py`: `drawdown_series`, `max_drawdown`, `drawdown_episodes`
-  (start/trough/recovery table), `ulcer_index`.
+  (start/trough/recovery table, `NaT` recovery while underwater),
+  `ulcer_index`.
 - `exposures.py`: `gross_net_exposure(weights)`, `sector_exposures(weights,
   sectors)`, `factor_exposures(returns, factor_returns)` via OLS.
 - `limits.py`: `RiskLimit` ABC with `check(state) -> list[LimitBreach]`;
