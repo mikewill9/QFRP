@@ -149,8 +149,10 @@ pins the interfaces each layer exposes. Complete and tested: data
 infrastructure, factor research (factors, signals, evaluation, experiment
 tracking), the event-driven backtest engine, performance analytics,
 portfolio construction (covariance estimation, optimizers, constraints,
-rebalancing), and risk monitoring (tail metrics, drawdowns, exposures,
-limits, reporting). Next in sequence: the ML pipeline and visualization.
+rebalancing), risk monitoring (tail metrics, drawdowns, exposures,
+limits, reporting), and the ML alpha pipeline (supervised panels,
+purged/walk-forward validation, model wrappers, OOS signal training,
+model registry). Next in sequence: visualization and tearsheets.
 
 ## Disclaimer
 

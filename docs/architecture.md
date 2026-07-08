@@ -177,23 +177,37 @@ Rules:
 - `report.py`: `RiskReport.from_backtest(result, ...)` -> frames + text
   summary.
 
-### 4.6 ml
+### 4.6 ml (complete)
 
 - `datasets.py`: `PanelDataset.from_factors(factors: dict[str, WideFrame],
-  prices, horizon)` -> long panel with `X`, `y`, `groups` (dates); strict
-  feature lagging.
+  prices, horizon, return_method, feature_lag)` -> long panel with `X`,
+  `y`, `groups` (dates), MultiIndex `(date, symbol)` rows. Targets come
+  from `research.evaluation.forward_returns` (label at `t` spans
+  `(t, t+h]`), so the standard alignment is causal; `feature_lag` adds
+  extra lag for sensitivity checks.
 - `validation.py`: `PurgedKFold(n_splits, horizon, embargo)` over date
-  groups; `WalkForward(train_periods, test_periods, step)`.
+  groups (training dates whose label windows overlap a test block are
+  purged on both sides, plus an embargo after);
+  `WalkForward(train_periods, test_periods, step, purge)` — strictly
+  past -> future, `purge` defaults to the panel's horizon. Both yield
+  `(train_rows, test_rows)` positions.
 - `models.py`: `ModelWrapper` protocol (`fit`, `predict`,
-  `feature_importances_` optional); `LinearModel`, `TreeModel`,
-  `GradientBoostingModel` (lightgbm if available else sklearn),
-  `EnsembleModel(models, weights)`.
+  `feature_importances_` may return None); `LinearModel` (ridge),
+  `TreeModel` (random forest; single-threaded by default for bit-exact
+  determinism), `GradientBoostingModel` (lightgbm if available else
+  sklearn, chosen at fit time), `EnsembleModel(models, weights)`.
+  Wrappers validate prediction columns against training columns.
 - `training.py`: `WalkForwardTrainer(model_factory, splitter).run(panel) ->
-  TrainedSignal` containing the out-of-sample prediction wide frame.
-- `evaluation.py`: regression metrics + rank IC of OOS predictions,
-  permutation importance.
-- `persistence.py`: `ModelRegistry(root)`: `save(model, name, manifest)`,
-  `load(name, version)`, `list()`.
+  TrainedSignal` with the OOS prediction wide frame, per-fold date
+  ranges, and the fitted models. Only WalkForward output is causal
+  enough to backtest; purged k-fold is for model selection.
+- `evaluation.py`: `regression_metrics(y_true, y_pred)`,
+  `prediction_rank_ic(predictions, prices, horizon)` (reuses the
+  research layer's IC machinery), `permutation_importance(model, X, y)`.
+- `persistence.py`: `ModelRegistry(root)`: `save(model, name, manifest)
+  -> version`, `load(name, version=None) -> (model, manifest)`,
+  `list()`; auto-incrementing `vNNNN` versions, manifest written last so
+  crashed saves are ignored.
 
 ### 4.7 analytics
 
