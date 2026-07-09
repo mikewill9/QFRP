@@ -1,5 +1,10 @@
 """Performance analytics on return series and weight frames."""
 
+from quantlab.analytics.attribution import (
+    FactorAttribution,
+    asset_contributions,
+    factor_attribution,
+)
 from quantlab.analytics.performance import (
     annualized_vol,
     cagr,
@@ -18,9 +23,12 @@ from quantlab.analytics.performance import (
 )
 
 __all__ = [
+    "FactorAttribution",
     "annualized_vol",
+    "asset_contributions",
     "cagr",
     "calmar_ratio",
+    "factor_attribution",
     "hit_rate",
     "kurtosis",
     "max_drawdown",

@@ -150,9 +150,11 @@ infrastructure, factor research (factors, signals, evaluation, experiment
 tracking), the event-driven backtest engine, performance analytics,
 portfolio construction (covariance estimation, optimizers, constraints,
 rebalancing), risk monitoring (tail metrics, drawdowns, exposures,
-limits, reporting), and the ML alpha pipeline (supervised panels,
+limits, reporting), the ML alpha pipeline (supervised panels,
 purged/walk-forward validation, model wrappers, OOS signal training,
-model registry). Next in sequence: visualization and tearsheets.
+model registry), performance attribution (asset and factor), and
+visualization (performance/factor/portfolio charts, tearsheets). All
+subsystems in `docs/architecture.md` are now implemented.
 
 ## Disclaimer
 

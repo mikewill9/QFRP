@@ -6,9 +6,21 @@ only), so the suite runs identically anywhere.
 
 from __future__ import annotations
 
+import matplotlib
 import pytest
 
-from quantlab.data import MarketDataset, make_synthetic_dataset
+matplotlib.use("Agg")  # headless backend for the whole suite
+
+import matplotlib.pyplot as plt  # noqa: E402 - backend must be set first
+
+from quantlab.data import MarketDataset, make_synthetic_dataset  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _close_figures():
+    """Close every matplotlib figure after each test to avoid pile-up."""
+    yield
+    plt.close("all")
 
 
 @pytest.fixture(scope="session")

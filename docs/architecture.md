@@ -209,26 +209,36 @@ Rules:
   `list()`; auto-incrementing `vNNNN` versions, manifest written last so
   crashed saves are ignored.
 
-### 4.7 analytics
+### 4.7 analytics (complete)
 
 - `performance.py`: `periods_per_year(index)`, `cagr`, `annualized_vol`,
   `sharpe_ratio(rf)`, `sortino_ratio`, `calmar_ratio`, `hit_rate`,
   `skewness`, `kurtosis`, `turnover(weights)`,
   `performance_summary(returns, weights=None) -> pd.Series`,
   `rolling_sharpe(window)`.
-- `attribution.py`: `asset_contributions(weights, asset_returns)`,
-  `factor_attribution(returns, factor_returns)` (alpha + beta
-  contributions with R^2).
+- `attribution.py`: `asset_contributions(weights, asset_returns)` (prior-bar
+  weight x realized return, per asset per bar); `factor_attribution(returns,
+  factor_returns) -> FactorAttribution` (OLS alpha + betas + R^2, plus a
+  per-period `contributions` frame — alpha, one column per factor, and
+  residual — that sums exactly back to the input returns). Both use the
+  standard linear-attribution approximation (no compounding cross-terms,
+  no costs); collinear factors raise rather than returning an arbitrary
+  least-squares solution.
 
-### 4.8 viz
+### 4.8 viz (complete)
 
-- `style.py` (`apply_style()`), `performance.py`
+- `style.py` (`apply_style()`, `PALETTE`), `performance.py`
   (`plot_equity_and_drawdown`, `plot_rolling_stats`,
   `plot_monthly_heatmap`), `factors.py` (`plot_ic`, `plot_quantile_returns`,
   `plot_factor_correlation`), `portfolio.py` (`plot_weights`,
-  `plot_contributions`), `tearsheet.py` (`tearsheet(result) -> Figure`).
-  All functions accept and return matplotlib objects; nothing calls
-  `plt.show()`.
+  `plot_contributions`), `tearsheet.py`
+  (`tearsheet(result, risk_report=None) -> Figure`; `risk_report` is an
+  optional `RiskReport` that adds a risk-metrics section to the summary
+  text without being a hard dependency of the signature).
+  Every function accepts an optional `ax`/`axes` and returns a `Figure`;
+  a function only calls `fig.tight_layout()` when it created its own
+  figure, so panels compose cleanly inside a caller's `GridSpec` (as
+  `tearsheet` does). Nothing calls `plt.show()`.
 
 ## 5. Error handling
 
