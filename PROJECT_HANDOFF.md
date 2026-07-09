@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 6: visualization and attribution
 - Checkpoint 5: ML alpha pipeline
 - Checkpoint 4: portfolio and risk layer
 - Checkpoint 3: backtesting engine
@@ -40,7 +41,7 @@ Completed checkpoints:
 
 Current HEAD:
 
-0656e5b Checkpoint 5: ML alpha pipeline
+306f123 Checkpoint 6: visualization and attribution
 
 The repository is the source of truth.
 
@@ -50,8 +51,9 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (340 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (408 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
+- Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
 
 
 # Completed Work
@@ -140,51 +142,59 @@ Completed (src/quantlab/ml/):
   the research layer), permutation importance
 - persistence: versioned model registry with JSON manifests
 
-Note: analytics/attribution.py (architecture.md section 4.7) was
-deferred from Checkpoint 4 and remains unimplemented.
 
+## Checkpoint 6: Visualization and Attribution
 
-# Current Development Stage
+Completed:
 
-## Checkpoint 6: Visualization + Analytics Attribution
+### Attribution (src/quantlab/analytics/attribution.py)
 
-This is the next milestone.
+- asset_contributions(weights, asset_returns): prior-bar weight x
+  realized return, per asset per bar
+- factor_attribution(returns, factor_returns) -> FactorAttribution:
+  OLS alpha, betas, R^2, plus a per-period contributions frame
+  (alpha, one column per factor, residual) that sums exactly back to
+  the input returns
 
+Both use the standard linear-attribution approximation (no compounding
+cross-terms, no costs); collinear factors raise rather than returning
+an arbitrary least-squares solution.
 
-# Visualization Module
+### Visualization (src/quantlab/viz/)
 
-Expected location:
-
-src/quantlab/viz/
-
-Contracts are pinned in docs/architecture.md section 4.8.
-
-Expected components:
-
-- style.py: apply_style()
+- style.py: apply_style(), PALETTE
 - performance.py: plot_equity_and_drawdown, plot_rolling_stats,
   plot_monthly_heatmap
 - factors.py: plot_ic, plot_quantile_returns, plot_factor_correlation
 - portfolio.py: plot_weights, plot_contributions
-- tearsheet.py: tearsheet(result) -> Figure
+- tearsheet.py: tearsheet(result, risk_report=None) -> Figure
 
-Rules:
+Every function accepts an optional ax/axes and returns a Figure; a
+function only calls fig.tight_layout() when it created its own figure,
+so panels compose cleanly inside tearsheet's GridSpec. Nothing calls
+plt.show(). risk_report is optional so a plain backtest result
+tearsheets without a hard dependency on quantlab.risk.
 
-- all functions accept and return matplotlib objects
-- nothing calls plt.show()
-- viz may import every other subsystem
+**All subsystems specified in docs/architecture.md are now implemented.**
 
 
-# Attribution Module
+# Current Development Stage
 
-Expected location:
+There is no active checkpoint. The architecture.md contract (sections
+4.1 through 4.8: data, research, backtest, portfolio, risk, ml,
+analytics, viz) is fully built, tested, and documented.
 
-src/quantlab/analytics/attribution.py
+Possible directions for future work (none currently planned/approved):
 
-Contract is pinned in docs/architecture.md section 4.7:
+- CLI or notebook-driven research workflow examples beyond examples/01-05
+- additional data sources / live execution adapters
+- deeper ML model families (e.g. neural nets) behind the same
+  ModelWrapper protocol
+- packaging/release polish (versioning, PyPI-style distribution)
 
-- asset_contributions(weights, asset_returns)
-- factor_attribution(returns, factor_returns) with alpha, betas, R^2
+Before starting any new direction: inspect the repository, read
+README.md and docs/architecture.md, and confirm scope with the user
+rather than assuming one of the above.
 
 
 # Development Rules
@@ -215,26 +225,9 @@ over unnecessary complexity.
 
 # Validation Requirements
 
-Before completing a checkpoint:
+Before completing any future checkpoint:
 
 - run the test suite
 - verify existing functionality still works
 - add tests for new functionality
 - document important assumptions
-
-
-# Next Milestone
-
-Complete:
-
-1. Visualization layer (style, performance, factors, portfolio, tearsheet)
-
-2. Analytics attribution
-
-3. Tests (matplotlib figures can be tested headless via the Agg backend)
-
-4. Documentation
-
-Then create a Git checkpoint:
-
-Checkpoint 6: visualization and attribution
