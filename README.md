@@ -74,8 +74,10 @@ src/quantlab/
 │   └── report.py            # consolidated risk report
 ├── ml/                      # ML alpha pipeline
 │   ├── datasets.py          # wide factors -> supervised panel
+│   ├── features.py          # factor specs -> normalized feature frames
 │   ├── validation.py        # purged k-fold w/ embargo, walk-forward
 │   ├── models.py            # linear, tree, ensemble wrappers
+│   ├── selection.py         # purged-CV model comparison (selection only)
 │   ├── training.py          # walk-forward trainer -> OOS signal
 │   ├── evaluation.py        # metrics, rank IC, importances
 │   └── persistence.py       # model registry with manifests
@@ -184,7 +186,8 @@ portfolio construction (covariance estimation, optimizers, constraints,
 rebalancing), risk monitoring (tail metrics, drawdowns, exposures,
 limits, reporting), the ML alpha pipeline (supervised panels,
 purged/walk-forward validation, model wrappers, OOS signal training,
-model registry), performance attribution (asset and factor),
+model registry, multi-factor feature assembly, purged-CV model
+selection), performance attribution (asset and factor),
 visualization (performance/factor/portfolio charts, tearsheets), and the
 point-in-time fundamental data layer with value/quality/growth factors.
 All subsystems in `docs/architecture.md` are implemented; see

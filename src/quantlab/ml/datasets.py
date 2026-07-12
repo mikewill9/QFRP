@@ -88,6 +88,7 @@ class PanelDataset:
         *,
         return_method: str = "log",
         feature_lag: int = 0,
+        target_transform: str = "raw",
     ) -> PanelDataset:
         """Build the panel from wide factor frames and a price frame.
 
@@ -95,6 +96,19 @@ class PanelDataset:
         symbols with ``prices``. ``feature_lag`` shifts every factor
         back by that many extra bars (0 keeps the standard signal-at-t /
         return-over-``(t, t+h]`` alignment, which is already causal).
+
+        ``target_transform`` reshapes the label cross-sectionally per
+        date, before stacking:
+
+        - ``"raw"``: the forward return unchanged. Default only for
+          backward compatibility.
+        - ``"demeaned"``: subtract each date's cross-sectional mean, so
+          the label is *relative* return within the universe. This is
+          the recommended setting for cross-sectional research — the
+          model should never fit the market level.
+        - ``"rank"``: per-date centered percentile ranks in
+          ``(-0.5, 0.5)`` (the ``research.signals.Rank(center=True)``
+          construction).
         """
         if not factors:
             raise DataError("factors dict is empty")
@@ -102,6 +116,11 @@ class PanelDataset:
             raise DataError(f"horizon must be >= 1, got {horizon}")
         if feature_lag < 0:
             raise DataError(f"feature_lag must be >= 0, got {feature_lag}")
+        if target_transform not in ("raw", "demeaned", "rank"):
+            raise DataError(
+                f"Unknown target_transform '{target_transform}' "
+                "(use 'raw', 'demeaned', or 'rank')"
+            )
 
         index = prices.index
         columns = prices.columns
@@ -116,6 +135,12 @@ class PanelDataset:
         index = index.sort_values()
 
         target = forward_returns(prices, horizon, method=return_method)
+        if target_transform == "demeaned":
+            target = target.sub(target.mean(axis=1), axis=0)
+        elif target_transform == "rank":
+            ranked = target.rank(axis=1)
+            n = target.notna().sum(axis=1)
+            target = ranked.sub((n + 1) / 2.0, axis=0).div(n, axis=0)
         long_parts = {"__target__": target.reindex(index=index, columns=columns)}
         for name, frame in factors.items():
             aligned = frame.reindex(index=index, columns=columns)

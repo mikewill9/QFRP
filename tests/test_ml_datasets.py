@@ -123,3 +123,58 @@ def test_all_nan_factor_raises():
     prices = _prices()
     with pytest.raises(DataError, match="No complete rows"):
         PanelDataset.from_factors({"f": prices * np.nan}, prices, horizon=1)
+
+
+def test_target_transform_demeaned_hand_computed():
+    # Two symbols with constructed prices -> known forward log returns.
+    idx = pd.bdate_range("2022-01-03", periods=6)
+    prices = pd.DataFrame(
+        {"A": [100.0, 110.0, 121.0, 133.1, 146.41, 161.051],
+         "B": [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]},
+        index=idx,
+    )
+    factor = prices * 0.0
+    panel = PanelDataset.from_factors(
+        {"f": factor}, prices, horizon=1, target_transform="demeaned"
+    )
+    # A's 1-bar log return is log(1.1) every bar, B's is 0; the per-date
+    # mean is log(1.1)/2, so labels are +/- log(1.1)/2, symmetric around 0.
+    half = np.log(1.1) / 2.0
+    t = idx[0]
+    assert panel.y.loc[(t, "A")] == pytest.approx(half)
+    assert panel.y.loc[(t, "B")] == pytest.approx(-half)
+    for date in panel.dates:
+        assert panel.y.xs(date, level="date").sum() == pytest.approx(0.0)
+
+
+def test_target_transform_rank_bounds():
+    prices = _prices(symbols=("A", "B", "C", "D"))
+    panel = PanelDataset.from_factors(
+        {"f": prices * 0.0}, prices, horizon=2, target_transform="rank"
+    )
+    assert (panel.y > -0.5).all() and (panel.y < 0.5).all()
+    # With 4 names per date, centered ranks are (r - 2.5) / 4.
+    expected = sorted((r - 2.5) / 4.0 for r in (1, 2, 3, 4))
+    for date in panel.dates:
+        labels = sorted(panel.y.xs(date, level="date"))
+        assert labels == pytest.approx(expected)
+
+
+def test_target_transform_raw_is_default_and_backward_compatible():
+    prices = _prices()
+    factor = prices * 0.0
+    default = PanelDataset.from_factors({"f": factor}, prices, horizon=3)
+    explicit = PanelDataset.from_factors(
+        {"f": factor}, prices, horizon=3, target_transform="raw"
+    )
+    pd.testing.assert_frame_equal(default.X, explicit.X)
+    pd.testing.assert_series_equal(default.y, explicit.y)
+    pd.testing.assert_series_equal(default.groups, explicit.groups)
+
+
+def test_target_transform_invalid_raises():
+    prices = _prices()
+    with pytest.raises(DataError, match="target_transform"):
+        PanelDataset.from_factors(
+            {"f": prices * 0.0}, prices, horizon=1, target_transform="zscore"
+        )

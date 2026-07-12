@@ -187,11 +187,14 @@ Rules:
 ### 4.6 ml (complete)
 
 - `datasets.py`: `PanelDataset.from_factors(factors: dict[str, WideFrame],
-  prices, horizon, return_method, feature_lag)` -> long panel with `X`,
-  `y`, `groups` (dates), MultiIndex `(date, symbol)` rows. Targets come
-  from `research.evaluation.forward_returns` (label at `t` spans
-  `(t, t+h]`), so the standard alignment is causal; `feature_lag` adds
-  extra lag for sensitivity checks.
+  prices, horizon, return_method, feature_lag, target_transform)` -> long
+  panel with `X`, `y`, `groups` (dates), MultiIndex `(date, symbol)` rows.
+  Targets come from `research.evaluation.forward_returns` (label at `t`
+  spans `(t, t+h]`), so the standard alignment is causal; `feature_lag`
+  adds extra lag for sensitivity checks. `target_transform` reshapes the
+  label per date: `"raw"` (default, backward compatible), `"demeaned"`
+  (relative return — recommended for cross-sectional research), `"rank"`
+  (centered percentile ranks in `(-0.5, 0.5)`).
 - `validation.py`: `PurgedKFold(n_splits, horizon, embargo)` over date
   groups (training dates whose label windows overlap a test block are
   purged on both sides, plus an embargo after);
@@ -215,6 +218,16 @@ Rules:
   -> version`, `load(name, version=None) -> (model, manifest)`,
   `list()`; auto-incrementing `vNNNN` versions, manifest written last so
   crashed saves are ignored.
+- `features.py`: `FeatureSpec(name, factor, transform=None)` and
+  `build_features(dataset, specs) -> dict[str, WideFrame]` — computes
+  each factor and applies its optional normalization, producing the
+  mapping `from_factors` consumes; validates non-empty specs and unique
+  names, preserves spec order.
+- `selection.py`: `compare_models(panel, model_factories, splitter) ->
+  DataFrame` (`mean_r2`, `std_r2`, `mean_mse`, `mean_rank_ic`,
+  `n_folds`; one row per model on identical folds, sorted by rank IC).
+  Selection only — its scores are interior-fold numbers; walk-forward
+  remains the only causal output.
 
 ### 4.7 analytics (complete)
 

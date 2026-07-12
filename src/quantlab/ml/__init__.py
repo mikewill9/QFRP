@@ -6,6 +6,7 @@ from quantlab.ml.evaluation import (
     prediction_rank_ic,
     regression_metrics,
 )
+from quantlab.ml.features import FeatureSpec, build_features
 from quantlab.ml.models import (
     EnsembleModel,
     GradientBoostingModel,
@@ -14,11 +15,13 @@ from quantlab.ml.models import (
     TreeModel,
 )
 from quantlab.ml.persistence import ModelRegistry
+from quantlab.ml.selection import compare_models
 from quantlab.ml.training import TrainedSignal, WalkForwardTrainer
 from quantlab.ml.validation import PurgedKFold, WalkForward
 
 __all__ = [
     "EnsembleModel",
+    "FeatureSpec",
     "GradientBoostingModel",
     "LinearModel",
     "ModelRegistry",
@@ -29,6 +32,8 @@ __all__ = [
     "TreeModel",
     "WalkForward",
     "WalkForwardTrainer",
+    "build_features",
+    "compare_models",
     "permutation_importance",
     "prediction_rank_ic",
     "regression_metrics",
