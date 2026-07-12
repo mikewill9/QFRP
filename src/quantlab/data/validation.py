@@ -14,6 +14,13 @@ suite of them and returns a :class:`ValidationReport`. Severity semantics:
 Structural invariants (sorted unique tz-naive index, aligned fields) are
 enforced by the :class:`~quantlab.data.dataset.MarketDataset` constructor and
 are therefore not re-checked here.
+
+Fundamental data has its own check family
+(:class:`FundamentalValidationCheck` subclasses run by
+:class:`FundamentalDataValidator`) sharing the same issue/report/severity
+machinery. Structural invariants of statement frames (id columns present,
+``publication_date >= period_end``, no duplicate versions) live in the
+:class:`~quantlab.data.fundamentals.FundamentalDataset` constructor.
 """
 
 from __future__ import annotations
@@ -28,23 +35,32 @@ import numpy as np
 import pandas as pd
 
 from quantlab.data.dataset import MarketDataset
+from quantlab.data.fundamentals import FundamentalDataset
 from quantlab.exceptions import DataValidationError
 from quantlab.types import Frequency
 
 __all__ = [
+    "AccountingIdentityCheck",
     "DataValidator",
     "ExtremeReturnCheck",
     "FrequencyGapCheck",
+    "FundamentalDataValidator",
+    "FundamentalValidationCheck",
     "MissingDataCheck",
+    "MissingStatementCheck",
+    "NonPositiveFundamentalCheck",
     "NonPositivePriceCheck",
     "OHLCConsistencyCheck",
+    "RestatementCheck",
     "Severity",
+    "StaleFundamentalValueCheck",
     "StalePriceCheck",
     "ValidationCheck",
     "ValidationIssue",
     "ValidationReport",
     "ZeroVolumeRunCheck",
     "default_checks",
+    "default_fundamental_checks",
 ]
 
 
@@ -425,4 +441,329 @@ class DataValidator:
             issues=tuple(issues),
             n_symbols=dataset.n_symbols,
             n_periods=dataset.n_periods,
+        )
+
+
+# ------------------------------------------------------- fundamental checks
+class FundamentalValidationCheck(ABC):
+    """Base class for fundamental data-quality checks.
+
+    Same contract as :class:`ValidationCheck`, but over a
+    :class:`~quantlab.data.fundamentals.FundamentalDataset`.
+    """
+
+    #: Human-readable identifier reported on issues.
+    name: str = "fundamental_check"
+
+    @abstractmethod
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        """Inspect ``dataset`` and return zero or more issues."""
+
+
+class MissingStatementCheck(FundamentalValidationCheck):
+    """Flag holes and stale coverage in each symbol's quarterly history.
+
+    A gap between consecutive period ends beyond ``max_gap_days`` means at
+    least one missing quarter (WARNING) — trailing-window factors will emit
+    NaN across it by design, but the researcher should know why. A symbol
+    whose latest statement trails the panel's overall latest period end by
+    more than ``stale_after_days`` has stale coverage (WARNING): its factor
+    values keep quoting increasingly old numbers.
+    """
+
+    name = "missing_statement"
+
+    def __init__(self, max_gap_days: int = 100, stale_after_days: int = 200) -> None:
+        if max_gap_days < 1 or stale_after_days < 1:
+            raise ValueError("max_gap_days and stale_after_days must be >= 1")
+        self.max_gap_days = max_gap_days
+        self.stale_after_days = stale_after_days
+
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        issues: list[ValidationIssue] = []
+        stmts = dataset.statements
+        if stmts.empty:
+            return issues
+        overall_latest = stmts["period_end"].max()
+        for sym, group in stmts.groupby("symbol"):
+            ends = group["period_end"].drop_duplicates().sort_values()
+            gaps = ends.diff().dt.days.iloc[1:]
+            big = gaps[gaps > self.max_gap_days]
+            if len(big):
+                gap_ends = ends.iloc[1:][gaps.gt(self.max_gap_days)]
+                issues.append(
+                    ValidationIssue(
+                        check=self.name,
+                        severity=Severity.WARNING,
+                        symbol=str(sym),
+                        message=f"{len(big)} gap(s) beyond {self.max_gap_days} days between "
+                        f"quarters (largest {int(big.max())} days); missing statement(s)",
+                        count=len(big),
+                        details={"dates": [str(d.date()) for d in gap_ends.head()]},
+                    )
+                )
+            behind = (overall_latest - ends.iloc[-1]).days
+            if behind > self.stale_after_days:
+                issues.append(
+                    ValidationIssue(
+                        check=self.name,
+                        severity=Severity.WARNING,
+                        symbol=str(sym),
+                        message=f"latest statement ({ends.iloc[-1].date()}) trails the "
+                        f"panel's latest period end by {behind} days",
+                        count=1,
+                    )
+                )
+        return issues
+
+
+class NonPositiveFundamentalCheck(FundamentalValidationCheck):
+    """Values that make a statement unusable are always ERROR.
+
+    Non-positive shares outstanding or total assets break every per-share
+    and scaled ratio; negative revenue is a vendor artifact. Negative
+    equity and negative earnings are economically legitimate and are NOT
+    flagged here (factor kernels handle them explicitly).
+    """
+
+    name = "non_positive_fundamental"
+
+    _RULES: tuple[tuple[str, str], ...] = (
+        ("shares_outstanding", "non-positive shares outstanding"),
+        ("total_assets", "non-positive total assets"),
+    )
+
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        issues: list[ValidationIssue] = []
+        stmts = dataset.statements
+        checks = list(self._RULES)
+        for item, message in checks:
+            if item not in dataset.items:
+                continue
+            bad = stmts[item].le(0.0) & stmts[item].notna()
+            self._collect(issues, stmts, bad, message)
+        if "revenue" in dataset.items:
+            bad = stmts["revenue"].lt(0.0) & stmts["revenue"].notna()
+            self._collect(issues, stmts, bad, "negative revenue")
+        return issues
+
+    def _collect(
+        self,
+        issues: list[ValidationIssue],
+        stmts: pd.DataFrame,
+        bad: pd.Series,
+        message: str,
+    ) -> None:
+        if not bad.any():
+            return
+        for sym, group in stmts.loc[bad].groupby("symbol"):
+            issues.append(
+                ValidationIssue(
+                    check=self.name,
+                    severity=Severity.ERROR,
+                    symbol=str(sym),
+                    message=message,
+                    count=len(group),
+                    details={"dates": [str(d.date()) for d in group["period_end"].head()]},
+                )
+            )
+
+
+class AccountingIdentityCheck(FundamentalValidationCheck):
+    """Assets must (approximately) equal liabilities plus equity.
+
+    Violations beyond ``rel_tol`` of total assets usually mean a bad column
+    mapping or corrupted vendor rows. The default tolerance is loose (5%)
+    because real vendors bucket minority interests inconsistently.
+    """
+
+    name = "accounting_identity"
+
+    def __init__(self, rel_tol: float = 0.05) -> None:
+        if rel_tol <= 0:
+            raise ValueError("rel_tol must be positive")
+        self.rel_tol = rel_tol
+
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        needed = ("total_assets", "total_liabilities", "total_equity")
+        if any(item not in dataset.items for item in needed):
+            return []
+        stmts = dataset.statements
+        rows = stmts.dropna(subset=list(needed))
+        if rows.empty:
+            return []
+        gap = (
+            rows["total_assets"] - rows["total_liabilities"] - rows["total_equity"]
+        ).abs()
+        bad = gap > self.rel_tol * rows["total_assets"].abs()
+        issues: list[ValidationIssue] = []
+        for sym, group in rows.loc[bad].groupby("symbol"):
+            worst = float(
+                (gap[group.index] / rows.loc[group.index, "total_assets"].abs()).max()
+            )
+            issues.append(
+                ValidationIssue(
+                    check=self.name,
+                    severity=Severity.WARNING,
+                    symbol=str(sym),
+                    message=f"assets != liabilities + equity beyond {self.rel_tol:.0%} "
+                    f"(worst gap {worst:.1%} of assets)",
+                    count=len(group),
+                    details={"dates": [str(d.date()) for d in group["period_end"].head()]},
+                )
+            )
+        return issues
+
+
+class StaleFundamentalValueCheck(FundamentalValidationCheck):
+    """Warn when a flow item repeats identically across consecutive quarters.
+
+    Quarterly revenue or cash flow identical to the last unit for
+    ``max_run`` consecutive quarters almost always means the vendor
+    forward-filled missing statements. Balance-sheet stocks and shares
+    outstanding legitimately repeat and are deliberately not checked.
+    """
+
+    name = "stale_fundamental_value"
+
+    def __init__(
+        self,
+        items: Sequence[str] = ("revenue", "net_income", "operating_cash_flow"),
+        max_run: int = 3,
+    ) -> None:
+        if max_run < 2:
+            raise ValueError("max_run must be >= 2")
+        self.items = tuple(items)
+        self.max_run = max_run
+
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        issues: list[ValidationIssue] = []
+        for item in self.items:
+            if item not in dataset.items:
+                continue
+            events = dataset.quarterly(item)
+            for sym, group in events.groupby("symbol"):
+                values = group.sort_values("period_end")["value"]
+                repeated = values.diff().eq(0.0) & values.ne(0.0)
+                run = _max_true_run(repeated.to_numpy())
+                # A run of k identical *changes* means k + 1 identical values.
+                if run + 1 >= self.max_run:
+                    issues.append(
+                        ValidationIssue(
+                            check=self.name,
+                            severity=Severity.WARNING,
+                            symbol=str(sym),
+                            message=f"'{item}' identical for {run + 1} consecutive quarters "
+                            "(vendor forward-fill suspected)",
+                            count=run + 1,
+                        )
+                    )
+        return issues
+
+
+class RestatementCheck(FundamentalValidationCheck):
+    """Surface restatements where the data makes them detectable.
+
+    A restatement is a second version of the same ``(symbol, period_end)``
+    with a later publication date. Snapshot vendors (Yahoo) never expose
+    these — absence of findings on such data means "not detectable", not
+    "no restatements". When versions exist, they are reported as INFO;
+    versions whose values changed by more than ``rel_change_warn`` on any
+    item are WARNING (the original print was materially wrong).
+    """
+
+    name = "restatement"
+
+    def __init__(self, rel_change_warn: float = 0.01) -> None:
+        if rel_change_warn <= 0:
+            raise ValueError("rel_change_warn must be positive")
+        self.rel_change_warn = rel_change_warn
+
+    def run(self, dataset: FundamentalDataset) -> list[ValidationIssue]:
+        stmts = dataset.statements
+        if stmts.empty:
+            return []
+        sizes = stmts.groupby(["symbol", "period_end"]).size()
+        multi = sizes[sizes > 1]
+        if multi.empty:
+            return []
+        issues: list[ValidationIssue] = []
+        items = dataset.items
+        for sym in multi.index.get_level_values("symbol").unique():
+            periods = multi.loc[sym].index
+            n_material = 0
+            worst = 0.0
+            for period_end in periods:
+                versions = stmts[
+                    (stmts["symbol"] == sym) & (stmts["period_end"] == period_end)
+                ].sort_values("publication_date")
+                first, last = versions.iloc[0], versions.iloc[-1]
+                for item in items:
+                    a, b = first[item], last[item]
+                    if pd.isna(a) or pd.isna(b) or a == 0:
+                        continue
+                    change = abs(float(b) - float(a)) / abs(float(a))
+                    worst = max(worst, change)
+                    if change > self.rel_change_warn:
+                        n_material += 1
+                        break
+            if n_material:
+                issues.append(
+                    ValidationIssue(
+                        check=self.name,
+                        severity=Severity.WARNING,
+                        symbol=str(sym),
+                        message=f"{n_material} quarter(s) restated with value changes "
+                        f"beyond {self.rel_change_warn:.1%} (worst {worst:.1%})",
+                        count=n_material,
+                    )
+                )
+            else:
+                issues.append(
+                    ValidationIssue(
+                        check=self.name,
+                        severity=Severity.INFO,
+                        symbol=str(sym),
+                        message=f"{len(periods)} quarter(s) have multiple statement versions",
+                        count=len(periods),
+                    )
+                )
+        return issues
+
+
+def default_fundamental_checks() -> list[FundamentalValidationCheck]:
+    """The standard suite applied by ``FundamentalDataValidator()``."""
+    return [
+        MissingStatementCheck(),
+        NonPositiveFundamentalCheck(),
+        AccountingIdentityCheck(),
+        StaleFundamentalValueCheck(),
+        RestatementCheck(),
+    ]
+
+
+class FundamentalDataValidator:
+    """Run a suite of checks against a fundamental dataset.
+
+    Parameters
+    ----------
+    checks:
+        Checks to execute; defaults to :func:`default_fundamental_checks`.
+    """
+
+    def __init__(self, checks: Sequence[FundamentalValidationCheck] | None = None) -> None:
+        self.checks = list(checks) if checks is not None else default_fundamental_checks()
+
+    def validate(self, dataset: FundamentalDataset) -> ValidationReport:
+        """Execute all checks and aggregate their issues.
+
+        ``n_periods`` on the report counts statements rather than bars.
+        """
+        issues: list[ValidationIssue] = []
+        for check in self.checks:
+            issues.extend(check.run(dataset))
+        return ValidationReport(
+            issues=tuple(issues),
+            n_symbols=len(dataset.symbols),
+            n_periods=dataset.n_statements,
         )

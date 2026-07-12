@@ -53,6 +53,13 @@ Rules:
   exists for research convenience and is explicitly labeled as optimistic.
 - Rolling estimators (covariance, PCA, ML training windows) use trailing
   windows ending at the decision date.
+- **Event-dated data (fundamentals) carry two dates**: the fiscal
+  `period_end` and the `publication_date` on which the observation became
+  public. All alignment onto price indexes goes through publication dates
+  (`pit_align`), so a statement is invisible until filed. Where true filing
+  dates are unavailable (yfinance), sources apply a conservative assumed
+  lag (default 45 calendar days after period end) and stamp
+  `metadata["publication_basis"] = "assumed_lag"`.
 
 ## 4. Subsystem contracts
 
@@ -240,6 +247,95 @@ Rules:
   figure, so panels compose cleanly inside a caller's `GridSpec` (as
   `tearsheet` does). Nothing calls `plt.show()`.
 
+### 4.9 fundamentals (complete)
+
+Point-in-time fundamental data and the factors built on it. The governing
+constraint is that a statement is usable only from its publication date,
+never from its period end (see §3).
+
+- **Statement frame** (container storage): long frame, one row per
+  `(symbol, period_end, publication_date)` with one numeric column per
+  item. Multiple rows sharing `(symbol, period_end)` are restatement
+  versions; the newest publication is the current view. Canonical items
+  (`FUNDAMENTAL_ITEMS`): `revenue`, `gross_profit`, `net_income`,
+  `total_assets`, `total_liabilities`, `total_equity`,
+  `shares_outstanding`, `operating_cash_flow`, `capital_expenditure`
+  (as-reported sign: negative = outflow, so FCF = OCF + capex). The
+  container accepts any additional numeric items (e.g. estimate series).
+- **Event frame** (alignment currency): columns
+  `["symbol", "period_end", "publication_date", "value"]` — one item's
+  observations, produced by `FundamentalDataset.quarterly/ttm` and consumed
+  by the alignment kernels.
+- `FundamentalDataset` (frozen dataclass): fields `statements`, `metadata`;
+  construction normalizes (dates parsed, symbols cast to str, rows sorted)
+  and raises on structural defects (`publication_date < period_end`,
+  duplicates, tz-aware dates, non-numeric items). Key methods:
+  `as_of(date)` (rows published on or before `date`; boundary inclusive),
+  `select`, `quarterly(item)` (all versions kept), `ttm(item, quarters=4)`,
+  `pit_panel(item, index, symbols, ttm=False)`, `with_metadata`, `equals`.
+- Alignment kernels (module functions in `data.fundamentals`):
+  - `pit_align(events, index, symbols) -> WideFrame`: value at `(t, sym)`
+    comes from the row with the greatest `period_end` among rows published
+    on or before `t` (ties/restatements resolve to the latest publication;
+    a late-restated old quarter never displaces a newer public quarter).
+    NaN before the first publication, never backfilled.
+  - `trailing_stat(events, quarters, stat="sum"|"std")`: rolling per-symbol
+    stats over consecutive fiscal quarters; usable at the window's **max**
+    publication date; windows spanning missing quarters are dropped, and
+    restatement versions collapse to each quarter's latest publication
+    (conservative, never lookahead).
+  - `trailing_change(events, quarters)`: relative change vs `quarters` ago
+    with an absolute-value denominator (sign-stable through negative
+    bases; zero bases NaN).
+  - `combine_events(left, right, func)`: row-wise combination on
+    `(symbol, period_end)`, usable at the later publication.
+- `FundamentalSource.fetch(symbols, start, end) -> FundamentalDataset`
+  (`start`/`end` filter `period_end`; callers fetch 6-8 quarters of history
+  before the first evaluation date). Implementations:
+  - `SyntheticFundamentalSource(n_assets, seed, inception,
+    publication_lag_days=45, publication_jitter_days=10)`: deterministic,
+    window-independent, internally consistent statements (accounting
+    identity exact, equity evolves by retained earnings, margins bounded);
+    symbol naming matches `SyntheticSource`. Independent of synthetic
+    prices, so statement-only factors have zero IC by construction (yield
+    ratios inherit a mild anti-momentum tilt from their price denominator).
+  - `YahooFundamentalSource(publication_lag_days=45, strict=True)`: behind
+    the `data` extra, imported inside `fetch`. Assumed publication lag
+    (Yahoo has no filing dates), trailing ~4-6 quarters only, silent vendor
+    restatements — all documented in the class docstring.
+- `CachedFundamentalSource(source, cache_dir)`: per-symbol parquet + covered
+  range sidecars under `{cache_dir}/{source.name}/quarterly/`, atomic
+  writes, corruption degrades to refetch. Merging **accumulates** quarters
+  that a snapshot vendor no longer serves — the honest way to build
+  point-in-time history going forward. `cached_range`, `clear`.
+- Validation (in `data.validation`, same issue/report machinery):
+  `FundamentalValidationCheck` ABC and
+  `FundamentalDataValidator(checks).validate(fds) -> ValidationReport` with
+  `default_fundamental_checks()`: `MissingStatementCheck` (quarter gaps,
+  stale coverage), `NonPositiveFundamentalCheck` (shares/assets <= 0,
+  negative revenue: ERROR), `AccountingIdentityCheck` (A = L + E within
+  tolerance), `StaleFundamentalValueCheck` (identical flow values across
+  quarters), `RestatementCheck` (multi-version detection; INFO/WARNING).
+- Factors (`research.factors.fundamental`), all standard `Factor`
+  subclasses taking the `FundamentalDataset` at construction with
+  `min_history = 1` (warmup is gated by publication dates, not bar count;
+  uncovered symbols are NaN columns, zero overlap raises):
+  - value: `EarningsYield` (TTM NI / mcap), `BookToMarket` (equity / mcap;
+    negative equity scores low, not NaN), `FCFYield` (TTM (OCF + capex) /
+    mcap); market cap uses point-in-time shares outstanding;
+  - quality: `ReturnOnEquity` (TTM NI / equity; NaN on non-positive
+    equity), `GrossMarginStability(quarters=8)` (negative trailing std of
+    gross margin), `Accruals` (negative TTM (NI - OCF) / assets — low
+    accruals rank high);
+  - growth: `RevenueGrowth(ttm=True)`, `EarningsGrowth(ttm=True)` (YoY,
+    absolute-value base; `ttm=False` compares single quarters and needs
+    only 5 quarters of vendor history);
+  - `EstimateRevision(estimates, estimate_item, window)`: interface only
+    against free data — raises `DataError` unless given a genuinely
+    point-in-time estimates panel (rows with `period_end ==
+    publication_date ==` snapshot date and a rolled consensus item), since
+    yfinance exposes only current estimate snapshots.
+
 ## 5. Error handling
 
 All framework exceptions derive from `QuantLabError` (see
@@ -259,6 +355,11 @@ values. Cache corruption degrades to refetching, never to a crash.
 
 - New data vendor: subclass `DataSource`, honor the contract in
   `sources/base.py`, wrap in `CachedSource`. Nothing else changes.
+- New fundamental vendor: subclass `FundamentalSource`, emit a statement
+  frame with real filing dates where available
+  (`publication_basis="reported"`), wrap in `CachedFundamentalSource`.
+  A point-in-time estimates vendor activates `EstimateRevision` by
+  supplying an estimates panel — no framework changes required.
 - New factor: subclass `Factor`, implement `compute`; it immediately works
   with signal pipelines, evaluation, experiments, and the ML panel builder.
 - New optimizer: implement `Optimizer.weights`; it plugs into
