@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 7: point-in-time fundamental data layer and fundamental factors
 - Checkpoint 6: visualization and attribution
 - Checkpoint 5: ML alpha pipeline
 - Checkpoint 4: portfolio and risk layer
@@ -39,9 +40,9 @@ Completed checkpoints:
 - Checkpoint 2: research subsystem
 - Checkpoint 1: initial quantlab framework
 
-Current HEAD:
+Latest checkpoint commit:
 
-306f123 Checkpoint 6: visualization and attribution
+5bd0934 Checkpoint 7: point-in-time fundamental data layer and fundamental factors
 
 The repository is the source of truth.
 
@@ -51,7 +52,7 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (408 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (439 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
 
@@ -178,23 +179,71 @@ tearsheets without a hard dependency on quantlab.risk.
 **All subsystems specified in docs/architecture.md are now implemented.**
 
 
+## Checkpoint 7: Point-in-Time Fundamental Data Layer and Fundamental Factors
+
+Completed:
+
+### Fundamentals (src/quantlab/data/fundamentals.py)
+
+- FundamentalDataset: statement panel where every observation carries
+  both its fiscal period_end AND the publication_date it became usable;
+  as_of(date) accessor; restatement versions supported
+- alignment kernels: pit_align (latest published value per date; a
+  late-restated old quarter never displaces a newer public one),
+  trailing_stat (TTM sums / stability stds, usable at the window's max
+  publication date), trailing_change (YoY with |base| denominator),
+  combine_events
+- sources: FundamentalSource ABC; SyntheticFundamentalSource
+  (deterministic, window-independent, internally consistent statements —
+  all tests and examples run offline); YahooFundamentalSource (behind
+  the data extra; assumed 45-day publication lag, documented as
+  optimistic for fiscal Q4 10-Ks); CachedFundamentalSource (parquet
+  cache that accumulates quarters snapshot vendors later drop)
+- validation: FundamentalDataValidator plus five checks (missing
+  statements, non-positive values, accounting identity, stale values,
+  restatement detection) in data/validation.py
+
+### Fundamental factors (src/quantlab/research/factors/fundamental.py)
+
+- value: EarningsYield, BookToMarket, FCFYield
+- quality: ReturnOnEquity, GrossMarginStability, Accruals
+- growth: RevenueGrowth, EarningsGrowth (TTM or quarterly YoY)
+- EstimateRevision: interface only — raises DataError until a genuine
+  point-in-time estimates source is connected (yfinance has no
+  estimate history; backtesting current snapshots would be lookahead)
+
+Governing constraint, pinned by publication-straddle tests: a factor
+value at date t changes only when information published on or before t
+changes.
+
+Also delivered: examples/06_fundamental_factors.py (offline),
+architecture.md section 4.9, and docs/research_roadmap.md — the staged
+research plan with mechanical implementation specs for stages 3 and 4.
+
+Known limits with free data (documented in docstrings and the roadmap):
+Yahoo serves only ~4-6 trailing quarters, no filing dates, silent
+restatements, survivorship-biased universe. Real multi-year fundamental
+research needs cache accumulation over time or a point-in-time vendor.
+
+
 # Current Development Stage
 
 There is no active checkpoint. The architecture.md contract (sections
-4.1 through 4.8: data, research, backtest, portfolio, risk, ml,
-analytics, viz) is fully built, tested, and documented.
+4.1 through 4.9: data, research, backtest, portfolio, risk, ml,
+analytics, viz, fundamentals) is fully built, tested, and documented.
 
-Possible directions for future work (none currently planned/approved):
+docs/research_roadmap.md is the plan of record for future work:
 
-- CLI or notebook-driven research workflow examples beyond examples/01-05
-- additional data sources / live execution adapters
-- deeper ML model families (e.g. neural nets) behind the same
-  ModelWrapper protocol
-- packaging/release polish (versioning, PyPI-style distribution)
+- Stage 3 (next): multi-factor ML combination through the existing
+  Checkpoint 5 pipeline — mechanical spec in roadmap Appendix B
+- Stage 4: universe expansion to 100+ names with point-in-time
+  membership — spec in roadmap Appendix C
+- Stages 5-6 (sentiment/NLP, macro regime overlays): outlined only,
+  data-gated
 
-Before starting any new direction: inspect the repository, read
-README.md and docs/architecture.md, and confirm scope with the user
-rather than assuming one of the above.
+Before starting any stage: inspect the repository, read README.md,
+docs/architecture.md, and docs/research_roadmap.md (its appendices are
+written to be executed as specified), and confirm scope with the user.
 
 
 # Development Rules
