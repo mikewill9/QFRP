@@ -74,10 +74,12 @@ as implemented are still *reported history* — genuinely forward-looking
 inputs (estimate revisions, guidance language, positioning) arrive in
 later stages, each demanding stricter validation than the last.
 
-The platform also currently researches ~10-40 name universes. Cross-
-sectional signals are statistically starved at that breadth: a 5-quantile
-portfolio on 30 names holds 6 per bucket, so single-stock noise dominates
-and IC estimates carry enormous error bars.
+Statistical breadth arrived with Checkpoint 9: point-in-time universe
+masks over 100+ names (cross-sectional signals are starved below that —
+a 5-quantile portfolio on 30 names holds 6 per bucket, so single-stock
+noise dominates and IC estimates carry enormous error bars). On real
+data the seed list is survivors-only, so breadth is honest in *timing*
+but not yet in *composition* (Appendix A).
 
 ---
 
@@ -88,8 +90,8 @@ and IC estimates carry enormous error bars.
 | 1 | Price/volume factors | done (CP 2) |
 | 2 | Fundamental factors, point-in-time statements | done (CP 7) |
 | 3 | Multi-factor ML combination | done (CP 8) |
-| 4 | Universe expansion to 100+ names | next — spec in Appendix C |
-| 5 | Sentiment / NLP | outlined below |
+| 4 | Universe expansion to 100+ names | done (CP 9) |
+| 5 | Sentiment / NLP | next — outlined below, data-gated |
 | 6 | Macro regime overlays for position sizing | outlined below |
 
 Stages 3 and 4 are deliberately ordered before 5 and 6: they multiply the
@@ -166,45 +168,41 @@ research still waits on cache accumulation or a point-in-time vendor
 §3 (feature budgets, selection inside purged CV, one walk-forward per
 configuration) is now load-bearing, not advisory.
 
-### Stage 4 — universe expansion to 100+ names
+### Stage 4 — universe expansion to 100+ names (complete, Checkpoint 9)
 
-**What it adds.** Statistical breadth. Fundamental and ML signals are
-cross-sectional bets; their information ratio scales roughly with the
-square root of independent breadth. Moving from 30 to 150 names takes a
-5-quantile portfolio from 6 to 30 names per bucket, shrinks IC error bars,
-makes sector neutralization meaningful (5+ names per sector), and makes
-capacity/cost modeling honest.
+**What it added.** `quantlab.data.universe`: `rolling_universe` producing
+**point-in-time membership masks** — at each rebalance bar, the top-N
+names by trailing dollar volume computed through that bar *only*, with a
+trailing-median price floor, held until the next rebalance;
+`apply_universe`, which NaNs signals outside membership (masks, never
+renormalizes); and a 150-name `US_LARGE_CAP_150` /
+`US_LARGE_CAP_SECTORS` seed list whose survivorship caveat is stated at
+the module, constants, example, and architecture-doc level. The mandated
+PIT test (perturbing volume strictly *after* a rebalance bar leaves
+membership at that bar unchanged) pins lookahead-freedom, mirroring the
+momentum-skip test. Factors and pipelines were untouched — breadth flows
+through the existing wide-frame convention. `examples/08_large_universe.py`
+runs the whole workflow offline on 150 synthetic names.
 
-**Data required.** Daily OHLCV for ~150 liquid US names (yfinance through
-the existing cache is adequate); fundamentals for the same universe
-(accumulating via `CachedFundamentalSource`); a static seed list of
-tickers and sectors, checked into the repo with its survivorship caveat
-documented.
+**What was deliberately cut.** Nothing from the Appendix C spec.
 
-**Where it plugs in.** A new `quantlab.data.universe` module producing
-**point-in-time membership masks** (top-N by trailing dollar volume, as of
-each rebalance date) plus a helper that NaNs signals outside the
-membership. Factors and pipelines are unchanged — breadth flows through
-the existing wide-frame convention. Exact spec: Appendix C.
+**What was discovered.** The example was specified to print "IR and
+t-stat rise with breadth", and the synthetic draw contradicted it: the
+30-name subset happened to draw a *higher* IC mean (0.048 vs 0.018), so
+its IR and t-stat were higher too. The error-bar claim is true in the
+right statistic — per-date IC std fell 0.207 → 0.108 moving 30 → 100
+names, almost exactly the √(100/30) shrinkage — so the example prints
+`ic_std` and explains that a small universe's measured IC level is
+dominated by the luck of the draw, which is precisely the problem breadth
+fixes. A lesson in reading the statistic that actually carries the claim.
 
-**What the ML layer predicts.** Unchanged (relative returns), now
-estimated on 3-5x the cross-section, which is the cheapest robustness
-upgrade available to the whole platform.
-
-**Overfitting risks introduced.**
-
-- *Survivorship bias becomes the dominant data risk*: a ticker list drawn
-  from today's large caps contains only winners; historical backtests on
-  it overstate returns (delisted losers are simply absent from Yahoo).
-  This must be stated on every result until a survivorship-free source
-  (Appendix A) arrives. Membership *timing* is handled point-in-time by
-  the universe mask; membership *composition* cannot be fixed with free
-  data.
-- *Silent universe drift*: if membership at date `t` uses volume from
-  after `t`, a subtle lookahead enters every downstream signal — the spec
-  mandates a dedicated PIT test mirroring the momentum-skip test.
-- *Liquidity illusion*: 150 names include thinner ones; realistic cost
-  and participation settings matter more, not less.
+**Honest limitations.** Membership *timing* is point-in-time by
+construction; membership *composition* is not — the seed list holds
+today's survivors only, free sources carry no delisted names, and every
+historical result on it overstates returns until a survivorship-free
+source (Appendix A) arrives. Say so on every result. 150 names also
+include thinner ones: realistic cost and participation settings matter
+more with breadth, not less.
 
 ### Stage 5 — sentiment / NLP
 
@@ -669,6 +667,8 @@ docstring stating its contract and its honesty caveats.
 ---
 
 ## Appendix C — implementation spec: Stage 4 (universe expansion to 100+ names)
+
+*Executed as Checkpoint 9; retained as the record of what was built.*
 
 *Same execution rules as Appendix B.*
 

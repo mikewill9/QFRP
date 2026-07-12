@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 9: point-in-time universe expansion (roadmap Stage 4)
 - Checkpoint 8: multi-factor ML combination (roadmap Stage 3)
 - Checkpoint 7: point-in-time fundamental data layer and fundamental factors
 - Checkpoint 6: visualization and attribution
@@ -43,7 +44,7 @@ Completed checkpoints:
 
 Latest checkpoint commit:
 
-956aab5 Checkpoint 8: multi-factor ML combination (Stage 3)
+8ec5f2a Checkpoint 9: point-in-time universe expansion (Stage 4)
 
 The repository is the source of truth.
 
@@ -53,7 +54,7 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (451 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (459 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
 
@@ -275,6 +276,48 @@ correct by construction; a blend that beat everything on synthetic data
 would indicate a leak.
 
 
+## Checkpoint 9: Point-in-Time Universe Expansion (Roadmap Stage 4)
+
+Completed (executed exactly per docs/research_roadmap.md Appendix C):
+
+### Universe (src/quantlab/data/universe.py)
+
+- rolling_universe(dataset, top_n=100, window=63, min_price=5.0,
+  rebalance_every=21): boolean dates x symbols membership mask. At each
+  rebalance bar (first at bar index window-1), symbols are ranked by
+  trailing mean dollar volume computed THROUGH that bar only; the top-N
+  with trailing median close >= min_price are members until the next
+  rebalance. NaN trailing volume excludes; rows before the first
+  rebalance are all False; top_n above the eligible count keeps all;
+  ties resolve by pandas nlargest order (documented).
+- apply_universe(frame, universe): NaNs cells outside membership,
+  reindexing the mask to the frame with missing entries as False.
+  Masks only — never renormalizes.
+- US_LARGE_CAP_150 / US_LARGE_CAP_SECTORS: 150 tickers with GICS-style
+  sectors; the comment block states the survivorship warning (survivors
+  only, results overstate historical returns).
+- 8 tests in tests/test_data_universe.py, including the mandatory PIT
+  lookahead pin: volume perturbed strictly AFTER a rebalance bar leaves
+  membership at that bar unchanged (mirror of the momentum-skip test).
+
+Also delivered: examples/08_large_universe.py (offline, 150 synthetic
+names -> 100-name PIT universe -> sector-neutralized momentum -> breadth
+comparison -> costed long/short backtest), architecture.md section 4.1
+bullet, README updates.
+
+Sanity result pinned by the example: per-date IC std fell 0.207 -> 0.108
+moving from 30 to 100 names (almost exactly the sqrt-of-breadth
+shrinkage). The 30-name subset drew a HIGHER ic_mean (0.048 vs 0.018) by
+luck, so the example prints ic_std and explains that a small universe's
+IC level is dominated by the draw — rather than asserting the originally
+planned "IR rises with breadth" claim, which this draw contradicted.
+
+Known limits: membership TIMING is point-in-time by construction;
+membership COMPOSITION is survivorship-biased with free data (the seed
+list holds today's survivors; no free source carries delisted names).
+State the caveat on every real-data result (roadmap Appendix A).
+
+
 # Current Development Stage
 
 There is no active checkpoint. The architecture.md contract (sections
@@ -283,10 +326,13 @@ analytics, viz, fundamentals) is fully built, tested, and documented.
 
 docs/research_roadmap.md is the plan of record for future work:
 
-- Stage 4 (next): universe expansion to 100+ names with point-in-time
-  membership — mechanical spec in roadmap Appendix C
-- Stages 5-6 (sentiment/NLP, macro regime overlays): outlined only,
-  data-gated
+- Stage 5 (next): sentiment / NLP — outlined only, DATA-GATED: it needs
+  a genuinely point-in-time text source (SEC EDGAR full text is the free
+  option; Tiingo/Polygon news are paid). No mechanical appendix spec
+  exists yet — write one (in the style of Appendices B/C) and agree it
+  with the user before implementing anything.
+- Stage 6 (macro regime overlays): outlined only, data-gated (ALFRED
+  vintages for point-in-time macro).
 
 Before starting any stage: inspect the repository, read README.md,
 docs/architecture.md, and docs/research_roadmap.md (its appendices are
