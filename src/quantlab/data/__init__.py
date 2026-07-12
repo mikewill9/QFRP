@@ -1,4 +1,4 @@
-"""Market data subsystem: sources, caching, storage, validation, preprocessing."""
+"""Market data subsystem: sources, caching, storage, validation, preprocessing, universe."""
 
 from quantlab.data.cache import CachedSource
 from quantlab.data.dataset import FIELDS, MarketDataset
@@ -31,6 +31,12 @@ from quantlab.data.sources import (
     make_synthetic_dataset,
 )
 from quantlab.data.store import DatasetStore
+from quantlab.data.universe import (
+    US_LARGE_CAP_150,
+    US_LARGE_CAP_SECTORS,
+    apply_universe,
+    rolling_universe,
+)
 from quantlab.data.validation import (
     DataValidator,
     FundamentalDataValidator,
@@ -61,12 +67,15 @@ __all__ = [
     "Severity",
     "SyntheticFundamentalSource",
     "SyntheticSource",
+    "US_LARGE_CAP_150",
+    "US_LARGE_CAP_SECTORS",
     "ValidationCheck",
     "ValidationIssue",
     "ValidationReport",
     "YahooFinanceSource",
     "YahooFundamentalSource",
     "align_intersection",
+    "apply_universe",
     "combine_events",
     "compute_returns",
     "default_checks",
@@ -77,6 +86,7 @@ __all__ = [
     "pit_align",
     "resample_dataset",
     "rolling_dollar_volume",
+    "rolling_universe",
     "trailing_change",
     "trailing_stat",
 ]

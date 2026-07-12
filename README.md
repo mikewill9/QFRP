@@ -44,7 +44,8 @@ src/quantlab/
 │   ├── store.py             # atomic parquet IO, named DatasetStore
 │   ├── validation.py        # composable data-quality checks
 │   │                        #   (prices and fundamentals)
-│   └── preprocessing.py     # returns, fills, resampling, universe filters
+│   ├── preprocessing.py     # returns, fills, resampling, universe filters
+│   └── universe.py          # point-in-time membership masks + seed list
 ├── research/                # alpha research
 │   ├── factors/             # Factor ABC + momentum, mean reversion,
 │   │                        #   volatility, liquidity, statistical (PCA),
@@ -188,8 +189,10 @@ limits, reporting), the ML alpha pipeline (supervised panels,
 purged/walk-forward validation, model wrappers, OOS signal training,
 model registry, multi-factor feature assembly, purged-CV model
 selection), performance attribution (asset and factor),
-visualization (performance/factor/portfolio charts, tearsheets), and the
-point-in-time fundamental data layer with value/quality/growth factors.
+visualization (performance/factor/portfolio charts, tearsheets), the
+point-in-time fundamental data layer with value/quality/growth factors,
+and point-in-time universe construction (rolling dollar-volume membership
+masks over a 150-name seed list, survivorship caveats documented).
 All subsystems in `docs/architecture.md` are implemented; see
 `docs/research_roadmap.md` for the staged research plan from here.
 

@@ -81,6 +81,13 @@ Rules:
 - Preprocessing: `compute_returns`, `forward_fill_prices`,
   `resample_dataset`, `align_intersection`, `filter_universe`,
   `rolling_dollar_volume`.
+- Universe (`universe.py`): `rolling_universe(dataset, *, top_n, window,
+  min_price, rebalance_every) -> bool WideFrame` — point-in-time membership
+  by construction (every rank uses trailing dollar volume through the
+  rebalance bar only); `apply_universe(frame, universe)` NaNs signals
+  outside membership without renormalizing; `US_LARGE_CAP_150` /
+  `US_LARGE_CAP_SECTORS` static seed list — survivors only, so results on
+  it overstate historical returns (roadmap Appendix A).
 
 ### 4.2 research (complete)
 
