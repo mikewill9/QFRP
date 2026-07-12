@@ -87,8 +87,8 @@ and IC estimates carry enormous error bars.
 |---|---|---|
 | 1 | Price/volume factors | done (CP 2) |
 | 2 | Fundamental factors, point-in-time statements | done (CP 7) |
-| 3 | Multi-factor ML combination | next — spec in Appendix B |
-| 4 | Universe expansion to 100+ names | spec in Appendix C |
+| 3 | Multi-factor ML combination | done (CP 8) |
+| 4 | Universe expansion to 100+ names | next — spec in Appendix C |
 | 5 | Sentiment / NLP | outlined below |
 | 6 | Macro regime overlays for position sizing | outlined below |
 
@@ -124,43 +124,47 @@ which arrives via the 10-K — use 60+ days for stricter tests),
 restatements invisible, universe survivorship-biased. The synthetic source
 exists precisely so the *machinery* is fully tested despite all this.
 
-### Stage 3 — multi-factor ML combination
+### Stage 3 — multi-factor ML combination (complete, Checkpoint 8)
 
-**What it adds.** Today each factor is evaluated alone. Stage 3 feeds
-price *and* fundamental factors jointly into the existing Checkpoint 5
-pipeline (`PanelDataset` → `WalkForwardTrainer`) so the model learns the
-weighting — including interactions a fixed-weight blend cannot express
-(e.g. momentum that is only trustworthy when accruals are low).
+**What it added.** Price *and* fundamental factors now feed jointly into
+the Checkpoint 5 pipeline so the model learns the weighting — including
+interactions a fixed-weight blend cannot express. Concretely:
+`ml/features.py` (`FeatureSpec` + `build_features`, the bridge from
+factor objects to the panel's feature dict; per-feature cross-sectional
+normalization so no feature smuggles in a market-level component);
+`ml/selection.py` (`compare_models`: candidates scored on *identical*
+purged folds, selection-only by contract — walk-forward remains the only
+causal output); a `target_transform` option on
+`PanelDataset.from_factors` (`"demeaned"` — the recommended setting —
+and `"rank"`, so the label is relative attractiveness within the
+universe, never the market level); and `examples/07_multifactor_ml.py`
+running the full workflow offline: six normalized features → demeaned
+panel → purged selection → one walk-forward → costed long/short
+backtest.
 
-**Data required.** None new. That is the point: Stage 3 multiplies the
-value of data already flowing.
+**What was deliberately cut.** Nothing from the Appendix B spec. No
+hyperparameter-search helper was added on top of `compare_models`:
+selection stays a small, enumerable, auditable set of candidates
+(doctrine rules 2 and 7), not an automated loop that silently multiplies
+trials.
 
-**Where it plugs in.** `quantlab.ml` gains a thin feature-assembly module
-(`ml/features.py`) and a model-comparison helper (`ml/selection.py`);
-`PanelDataset.from_factors` gains a `target_transform` option. Everything
-else — splitters, trainers, models, registry, evaluation — already exists.
-Exact spec: Appendix B.
+**What was discovered.** A degenerate-candidate edge case: a zero-skill
+model predicting a constant has *undefined* rank IC (Spearman needs
+variation), not zero — `compare_models` skips such dates rather than
+reporting a fake 0. And the synthetic-market sanity check landed exactly
+as §3 predicts: ridge won selection, the walk-forward blend's OOS rank
+IC (+0.06) sat *below* raw momentum's (+0.09), and fundamental features
+contributed ≈ nothing (statements are generated independently of
+prices). On synthetic data that underperformance is the correct result;
+a blend that beat everything would have been a leak.
 
-**What the ML layer predicts.** Cross-sectionally **demeaned** (or
-rank-transformed) forward returns over `(t, t+h]`, i.e. relative
-attractiveness within the universe on each date. Never absolute prices,
-never raw index-level returns: subtracting the per-date cross-sectional
-mean removes the market component the model has no business fitting.
-
-**Overfitting risks introduced.**
-
-- *Feature multiplicity*: every added factor multiplies the hypothesis
-  space; with ~10 features and monthly labels on a few years of data, an
-  unregularized learner will fit noise with certainty. Mitigations: ridge
-  and shallow GBMs only, feature counts in the low tens, purged CV for
-  every selection decision.
-- *Hyperparameter leakage*: tuning on walk-forward OOS results and
-  re-running is training on the test set. Model/hyperparameter selection
-  happens **inside** purged CV; walk-forward output is produced once per
-  finalized configuration.
-- *Scale leakage*: features must be cross-sectionally normalized per date
-  (the existing `ZScore`/`Rank` transforms) so no feature smuggles in a
-  market-level signal.
+**Honest limitations.** The blend inherits the data limits of its
+inputs: with Yahoo's ~4-6 quarters, real multi-year multi-factor
+research still waits on cache accumulation or a point-in-time vendor
+(Appendix A), and any real-data conclusion is statistically starved at
+~30 names until Stage 4 breadth arrives. The overfitting discipline in
+§3 (feature budgets, selection inside purged CV, one walk-forward per
+configuration) is now load-bearing, not advisory.
 
 ### Stage 4 — universe expansion to 100+ names
 
@@ -411,6 +415,8 @@ foundation. Sentiment data is the last dollar, not the first.
 ---
 
 ## Appendix B — implementation spec: Stage 3 (multi-factor ML combination)
+
+*Executed as Checkpoint 8; retained as the record of what was built.*
 
 *Written for mechanical execution. Follow the development workflow in
 `CLAUDE.md`: inspect, implement, test, run `python -m pytest`,

@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 8: multi-factor ML combination (roadmap Stage 3)
 - Checkpoint 7: point-in-time fundamental data layer and fundamental factors
 - Checkpoint 6: visualization and attribution
 - Checkpoint 5: ML alpha pipeline
@@ -42,7 +43,7 @@ Completed checkpoints:
 
 Latest checkpoint commit:
 
-5bd0934 Checkpoint 7: point-in-time fundamental data layer and fundamental factors
+956aab5 Checkpoint 8: multi-factor ML combination (Stage 3)
 
 The repository is the source of truth.
 
@@ -52,7 +53,7 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (439 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (451 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
 
@@ -226,6 +227,54 @@ restatements, survivorship-biased universe. Real multi-year fundamental
 research needs cache accumulation over time or a point-in-time vendor.
 
 
+## Checkpoint 8: Multi-Factor ML Combination (Roadmap Stage 3)
+
+Completed (executed exactly per docs/research_roadmap.md Appendix B):
+
+### Feature assembly (src/quantlab/ml/features.py)
+
+- FeatureSpec(name, factor, transform=None): one feature — a factor
+  plus optional post-compute normalization
+- build_features(dataset, specs) -> dict[str, WideFrame]: computes
+  each factor and applies its transform, producing the mapping
+  PanelDataset.from_factors consumes; validates non-empty specs and
+  unique names, preserves order. Fundamental factors carry their own
+  FundamentalDataset from construction, so mixed price/fundamental
+  feature sets need nothing extra.
+
+### Model selection (src/quantlab/ml/selection.py)
+
+- compare_models(panel, model_factories, splitter) -> DataFrame:
+  one row per candidate (mean_r2, std_r2, mean_mse, mean_rank_ic,
+  n_folds), every candidate scored on identical folds, fresh model
+  per (model, fold), sorted by mean_rank_ic. SELECTION ONLY — its
+  scores are interior-fold numbers; walk-forward remains the only
+  output causal enough to quote or backtest.
+- Dates where predictions (or targets) are constant are skipped when
+  averaging rank IC: Spearman is undefined there, not zero.
+
+### Panel targets (src/quantlab/ml/datasets.py)
+
+- PanelDataset.from_factors gained target_transform: "raw" (default,
+  exact backward compatibility), "demeaned" (per-date cross-sectional
+  demeaning — the recommended setting; the label is relative return
+  and the model never fits the market level), "rank" (centered
+  percentile ranks in (-0.5, 0.5)).
+
+Also delivered: examples/07_multifactor_ml.py (offline: six normalized
+price+fundamental features -> demeaned panel -> purged model comparison
+-> one walk-forward -> costed long/short backtest), 12 new tests
+(tests/test_ml_features.py, tests/test_ml_selection.py, extended
+tests/test_ml_datasets.py), architecture.md section 4.6 and README
+updates.
+
+Sanity result pinned by the example: on the synthetic market ridge won
+selection and the ML blend's OOS rank IC (+0.06) sat below raw
+momentum's (+0.09), with fundamental features contributing ~nothing —
+correct by construction; a blend that beat everything on synthetic data
+would indicate a leak.
+
+
 # Current Development Stage
 
 There is no active checkpoint. The architecture.md contract (sections
@@ -234,10 +283,8 @@ analytics, viz, fundamentals) is fully built, tested, and documented.
 
 docs/research_roadmap.md is the plan of record for future work:
 
-- Stage 3 (next): multi-factor ML combination through the existing
-  Checkpoint 5 pipeline — mechanical spec in roadmap Appendix B
-- Stage 4: universe expansion to 100+ names with point-in-time
-  membership — spec in roadmap Appendix C
+- Stage 4 (next): universe expansion to 100+ names with point-in-time
+  membership — mechanical spec in roadmap Appendix C
 - Stages 5-6 (sentiment/NLP, macro regime overlays): outlined only,
   data-gated
 
