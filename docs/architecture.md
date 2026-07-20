@@ -205,9 +205,11 @@ Rules:
 - `validation.py`: `PurgedKFold(n_splits, horizon, embargo)` over date
   groups (training dates whose label windows overlap a test block are
   purged on both sides, plus an embargo after);
-  `WalkForward(train_periods, test_periods, step, purge)` — strictly
-  past -> future, `purge` defaults to the panel's horizon. Both yield
-  `(train_rows, test_rows)` positions.
+  `WalkForward(train_periods, test_periods, step, purge, mode)` — strictly
+  past -> future, `purge` defaults to the panel's horizon; `mode` is
+  `"rolling"` (default, fixed-size window) or `"expanding"` (window
+  pinned at the first date and growing by `step`; `train_periods` is the
+  initial size). Both yield `(train_rows, test_rows)` positions.
 - `models.py`: `ModelWrapper` protocol (`fit`, `predict`,
   `feature_importances_` may return None); `LinearModel` (ridge),
   `TreeModel` (random forest; single-threaded by default for bit-exact
@@ -218,6 +220,9 @@ Rules:
   TrainedSignal` with the OOS prediction wide frame, per-fold date
   ranges, and the fitted models. Only WalkForward output is causal
   enough to backtest; purged k-fold is for model selection.
+  `coefficient_history(signal) -> DataFrame` (one row per fold indexed
+  by `test_start`, one column per feature) exposes how a linear model's
+  combination weights evolved; raises on models without `coef_`.
 - `evaluation.py`: `regression_metrics(y_true, y_pred)`,
   `prediction_rank_ic(predictions, prices, horizon)` (reuses the
   research layer's IC machinery), `permutation_importance(model, X, y)`.
@@ -292,7 +297,11 @@ never from its period end (see §3).
   duplicates, tz-aware dates, non-numeric items). Key methods:
   `as_of(date)` (rows published on or before `date`; boundary inclusive),
   `select`, `quarterly(item)` (all versions kept), `ttm(item, quarters=4)`,
-  `pit_panel(item, index, symbols, ttm=False)`, `with_metadata`, `equals`.
+  `pit_panel(item, index, symbols, ttm=False)`,
+  `coverage_table(item, index, symbols, ttm=False)` (per-date
+  `n_covered` / `n_universe` / `pct_covered` — report it whenever
+  sparse fundamentals feed a panel, since panel rows with any missing
+  feature are dropped), `with_metadata`, `equals`.
 - Alignment kernels (module functions in `data.fundamentals`):
   - `pit_align(events, index, symbols) -> WideFrame`: value at `(t, sym)`
     comes from the row with the greatest `period_end` among rows published

@@ -105,15 +105,27 @@ class PurgedKFold:
 
 
 class WalkForward:
-    """Rolling train -> gap -> test windows marching forward in time.
+    """Rolling or expanding train -> gap -> test windows marching forward.
 
-    Every window trains on ``train_periods`` dates, skips ``purge``
-    dates (defaults to the panel's label horizon, so no training label
-    window reaches into the test block), then tests on the next
-    ``test_periods`` dates. ``step`` (default ``test_periods``) advances
-    the window, so default test blocks tile the sample without overlap
-    and the concatenated test predictions form one continuous
-    out-of-sample signal.
+    Every window trains on past dates, skips ``purge`` dates (defaults
+    to the panel's label horizon, so no training label window reaches
+    into the test block), then tests on the next ``test_periods`` dates.
+    ``step`` (default ``test_periods``) advances the window, so default
+    test blocks tile the sample without overlap and the concatenated
+    test predictions form one continuous out-of-sample signal.
+
+    ``mode`` controls the training window:
+
+    - ``"rolling"`` (default): every fold trains on exactly the most
+      recent ``train_periods`` dates — old data ages out, so the model
+      adapts faster but sees fewer observations.
+    - ``"expanding"``: the training window always starts at the first
+      date and grows by ``step`` each fold; ``train_periods`` is the
+      *initial* window (the first fold is identical to rolling). More
+      data per fit, slower adaptation to regime change.
+
+    Both modes train strictly on the past; expanding never reaches any
+    closer to the test block, it only extends further back.
     """
 
     def __init__(
@@ -122,6 +134,7 @@ class WalkForward:
         test_periods: int,
         step: int | None = None,
         purge: int | None = None,
+        mode: str = "rolling",
     ) -> None:
         if train_periods < 1:
             raise ModelError(f"train_periods must be >= 1, got {train_periods}")
@@ -131,10 +144,15 @@ class WalkForward:
             raise ModelError(f"step must be >= 1, got {step}")
         if purge is not None and purge < 0:
             raise ModelError(f"purge must be >= 0, got {purge}")
+        if mode not in ("rolling", "expanding"):
+            raise ModelError(
+                f"Unknown mode '{mode}' (use 'rolling' or 'expanding')"
+            )
         self.train_periods = train_periods
         self.test_periods = test_periods
         self.step = test_periods if step is None else step
         self.purge = purge
+        self.mode = mode
 
     def split(self, panel: PanelDataset) -> Iterator[Split]:
         """Yield ``(train_rows, test_rows)``, strictly past -> future."""
@@ -153,7 +171,8 @@ class WalkForward:
             if test_start >= m:
                 break
             test_end = min(test_start + self.test_periods, m)
-            train_positions = np.arange(start, start + self.train_periods)
+            train_start = 0 if self.mode == "expanding" else start
+            train_positions = np.arange(train_start, start + self.train_periods)
             test_positions = np.arange(test_start, test_end)
             produced = True
             yield _rows_for(codes, train_positions), _rows_for(codes, test_positions)

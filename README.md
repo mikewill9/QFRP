@@ -89,7 +89,9 @@ src/quantlab/
 ```
 
 Supporting directories: `tests/` (pytest suite), `examples/` (end-to-end
-scripts, all offline), `notebooks/` (research walkthrough), `docs/`
+scripts, all offline), `notebooks/` (`factor_research.ipynb` is the
+primary config-driven research notebook — single-factor backtests or
+walk-forward Ridge factor combination on real cached data), `docs/`
 (architecture and per-subsystem documentation).
 
 ## Installation

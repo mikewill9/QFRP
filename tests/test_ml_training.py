@@ -11,8 +11,10 @@ from quantlab.ml import (
     LinearModel,
     PanelDataset,
     PurgedKFold,
+    TreeModel,
     WalkForward,
     WalkForwardTrainer,
+    coefficient_history,
 )
 
 
@@ -109,3 +111,39 @@ def test_trainer_metadata_round_trip():
 def test_trainer_rejects_non_callable_factory():
     with pytest.raises(ModelError, match="callable"):
         WalkForwardTrainer(LinearModel(), WalkForward(10, 5))  # type: ignore[arg-type]
+
+
+# ------------------------------------------------------- coefficient_history
+
+
+def test_coefficient_history_exact_on_noiseless_relation():
+    # Forward return is exactly 2 * factor, so plain least squares recovers
+    # the coefficient 2.0 in every fold.
+    panel, _ = _planted_panel(beta=2.0, noise=0.0)
+    signal = WalkForwardTrainer(
+        lambda: LinearModel(alpha=0.0), WalkForward(train_periods=40, test_periods=20)
+    ).run(panel)
+    history = coefficient_history(signal)
+    assert np.allclose(history["f"].to_numpy(), 2.0, atol=1e-6)
+
+
+def test_coefficient_history_frame_contract():
+    panel, _ = _planted_panel()
+    signal = WalkForwardTrainer(
+        lambda: LinearModel(), WalkForward(train_periods=40, test_periods=20)
+    ).run(panel)
+    history = coefficient_history(signal)
+    assert list(history.columns) == signal.feature_names
+    assert len(history) == signal.n_folds
+    assert history.index.name == "test_start"
+    assert (history.index == pd.DatetimeIndex(signal.folds["test_start"])).all()
+
+
+def test_coefficient_history_rejects_models_without_coefficients():
+    panel, _ = _planted_panel()
+    signal = WalkForwardTrainer(
+        lambda: TreeModel(n_estimators=5, max_depth=2),
+        WalkForward(train_periods=40, test_periods=20),
+    ).run(panel)
+    with pytest.raises(ModelError, match="coef_"):
+        coefficient_history(signal)

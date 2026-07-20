@@ -326,6 +326,41 @@ class FundamentalDataset:
         cols = list(symbols) if symbols is not None else self.symbols
         return pit_align(events, index, cols)
 
+    def coverage_table(
+        self,
+        item: str,
+        index: pd.DatetimeIndex,
+        symbols: Sequence[str] | None = None,
+        *,
+        ttm: bool = False,
+    ) -> pd.DataFrame:
+        """Per-date coverage of ``item`` across a universe, for reporting.
+
+        One row per date of ``index`` with columns ``n_covered`` (symbols
+        whose latest-published value of ``item`` is available at that
+        date), ``n_universe`` (size of ``symbols``, or this dataset's
+        symbols when omitted), and ``pct_covered`` (their ratio, 0-100).
+
+        Use this to make sparse fundamental data visible instead of
+        silently dropped: panels drop rows with any missing feature, so a
+        universe that is 20% covered produces a panel a fifth the size —
+        report the coverage next to any result that includes fundamental
+        factors.
+        """
+        panel = self.pit_panel(item, index, symbols, ttm=ttm)
+        n_universe = panel.shape[1]
+        if n_universe == 0:
+            raise DataError("coverage_table needs at least one symbol")
+        n_covered = panel.notna().sum(axis=1)
+        return pd.DataFrame(
+            {
+                "n_covered": n_covered.astype(int),
+                "n_universe": n_universe,
+                "pct_covered": 100.0 * n_covered / n_universe,
+            },
+            index=index,
+        )
+
     # -------------------------------------------------------------- plumbing
     def with_metadata(self, **updates: Any) -> FundamentalDataset:
         """Return a copy with metadata keys merged in."""

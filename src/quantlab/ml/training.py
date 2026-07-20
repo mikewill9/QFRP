@@ -27,7 +27,7 @@ from quantlab.ml.models import ModelWrapper
 from quantlab.ml.validation import PurgedKFold, WalkForward
 from quantlab.types import WideFrame
 
-__all__ = ["TrainedSignal", "WalkForwardTrainer"]
+__all__ = ["TrainedSignal", "WalkForwardTrainer", "coefficient_history"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,3 +133,30 @@ class WalkForwardTrainer:
             horizon=panel.horizon,
             feature_names=panel.feature_names,
         )
+
+
+def coefficient_history(signal: TrainedSignal) -> pd.DataFrame:
+    """Per-fold linear coefficients: one row per fold, one column per feature.
+
+    The row indexed by a fold's ``test_start`` describes the model whose
+    predictions begin on that date — fitted strictly on earlier data — so
+    plotting this frame over time is an honest picture of how the
+    combination weights evolved out-of-sample. Coefficients are comparable
+    across features only when the features share a scale (z-score them).
+
+    Only defined when every fold's model exposes ``coef_``
+    (:class:`~quantlab.ml.models.LinearModel`); tree and ensemble models
+    have no linear coefficients and raise :class:`ModelError`.
+    """
+    rows: list[pd.Series] = []
+    for position, model in enumerate(signal.models):
+        coef = getattr(model, "coef_", None)
+        if coef is None:
+            raise ModelError(
+                f"Fold {position} model {type(model).__name__} has no coef_; "
+                "coefficient_history needs linear models (LinearModel)"
+            )
+        rows.append(coef)
+    history = pd.DataFrame(rows)
+    history.index = pd.DatetimeIndex(signal.folds["test_start"], name="test_start")
+    return history.reindex(columns=signal.feature_names)

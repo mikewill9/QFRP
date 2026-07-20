@@ -599,3 +599,36 @@ def test_fundamental_validator_aggregates_and_raises():
     assert report.n_errors >= 1
     with pytest.raises(Exception, match="non_positive_fundamental"):
         report.raise_for_errors()
+
+
+# ---------------------------------------------------------------- coverage
+
+
+def test_coverage_table_hand_computed():
+    # A's Q1 publishes May 15; B's Q1 publishes Aug 14. Before either
+    # publication nothing is covered, in between only A, afterwards both.
+    rows = simple_rows("A", values=(1.0,), periods=Q[:1]) + simple_rows(
+        "B", values=(2.0,), periods=Q[:1], pubs=pd.DatetimeIndex([PUB[1]])
+    )
+    ds = make_dataset(rows)
+    index = pd.DatetimeIndex(["2019-05-01", "2019-06-01", "2019-09-01"])
+    table = ds.coverage_table("net_income", index)
+    assert list(table.columns) == ["n_covered", "n_universe", "pct_covered"]
+    assert table["n_covered"].tolist() == [0, 1, 2]
+    assert table["n_universe"].tolist() == [2, 2, 2]
+    assert table["pct_covered"].tolist() == [0.0, 50.0, 100.0]
+
+
+def test_coverage_table_counts_uncovered_universe_symbols():
+    ds = make_dataset(simple_rows("A", values=(1.0,), periods=Q[:1]))
+    index = pd.DatetimeIndex(["2019-06-01"])
+    table = ds.coverage_table("net_income", index, symbols=["A", "YYY", "ZZZ"])
+    assert table.loc[index[0], "n_covered"] == 1
+    assert table.loc[index[0], "n_universe"] == 3
+    assert table.loc[index[0], "pct_covered"] == pytest.approx(100.0 / 3.0)
+
+
+def test_coverage_table_empty_universe_raises():
+    ds = make_dataset(simple_rows("A"))
+    with pytest.raises(DataError, match="at least one symbol"):
+        ds.coverage_table("net_income", pd.DatetimeIndex(["2019-06-01"]), symbols=[])

@@ -160,3 +160,49 @@ def test_walk_forward_raises_without_enough_dates():
 def test_walk_forward_validation(kwargs):
     with pytest.raises(ModelError):
         WalkForward(**kwargs)
+
+
+# ------------------------------------------------- WalkForward expanding mode
+
+
+def test_walk_forward_default_mode_is_rolling():
+    assert WalkForward(5, 5).mode == "rolling"
+
+
+def test_walk_forward_expanding_first_fold_matches_rolling():
+    panel = _panel(n_dates=80, horizon=2)
+    rolling = list(WalkForward(20, 10).split(panel))
+    expanding = list(WalkForward(20, 10, mode="expanding").split(panel))
+    assert len(rolling) == len(expanding)
+    np.testing.assert_array_equal(rolling[0][0], expanding[0][0])
+    np.testing.assert_array_equal(rolling[0][1], expanding[0][1])
+
+
+def test_walk_forward_expanding_train_grows_from_first_date():
+    # 80 bars, horizon 2 -> 78 panel dates; train=20, purge=2, test=10 gives
+    # folds at start = 0, 10, ..., 50 with the k-th training on 20 + 10k dates.
+    panel = _panel(n_dates=80, horizon=2)
+    folds = list(
+        WalkForward(train_periods=20, test_periods=10, mode="expanding").split(panel)
+    )
+    assert len(folds) == 6
+    for k, (train_rows, test_rows) in enumerate(folds):
+        train_pos = _date_positions(panel, train_rows)
+        test_pos = _date_positions(panel, test_rows)
+        assert train_pos.min() == 0  # window pinned at the first date
+        assert len(train_pos) == 20 + 10 * k  # grows by step each fold
+        # The purge gap to the test block is preserved exactly.
+        assert test_pos.min() - train_pos.max() - 1 == panel.horizon
+
+
+def test_walk_forward_expanding_stays_strictly_causal():
+    panel = _panel(n_dates=80, horizon=5)
+    for train_rows, test_rows in WalkForward(20, 10, mode="expanding").split(panel):
+        train_pos = _date_positions(panel, train_rows)
+        test_pos = _date_positions(panel, test_rows)
+        assert train_pos.max() < test_pos.min()
+
+
+def test_walk_forward_invalid_mode_raises():
+    with pytest.raises(ModelError, match="mode"):
+        WalkForward(5, 5, mode="growing")
