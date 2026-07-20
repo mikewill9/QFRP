@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 10: ML combination wiring and general factor research notebook
 - Checkpoint 9: point-in-time universe expansion (roadmap Stage 4)
 - Checkpoint 8: multi-factor ML combination (roadmap Stage 3)
 - Checkpoint 7: point-in-time fundamental data layer and fundamental factors
@@ -44,7 +45,11 @@ Completed checkpoints:
 
 Latest checkpoint commit:
 
-8ec5f2a Checkpoint 9: point-in-time universe expansion (Stage 4)
+9d753c1 Checkpoint 10: ML combination wiring and general factor research notebook
+
+Between checkpoints 9 and 10 a research-experiments commit (b067be5)
+ran factor testing on US_LARGE_CAP_149 (real Yahoo data) in
+notebooks/momentum_research.ipynb.
 
 The repository is the source of truth.
 
@@ -54,9 +59,12 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (459 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (470 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
+- Real-data caches (`~/.quantlab/cache`) are machine-local and not in git.
+  The 2015-2024 price cache for US_LARGE_CAP_149 lives on the primary
+  (Windows) machine; a fresh clone re-downloads on first notebook run.
 
 
 # Completed Work
@@ -318,11 +326,81 @@ list holds today's survivors; no free source carries delisted names).
 State the caveat on every real-data result (roadmap Appendix A).
 
 
+## Checkpoint 10: ML Combination Wiring and General Factor Research Notebook
+
+Completed: the Checkpoint 8 ML layer wired up for real-data experiments,
+plus a new primary research notebook.
+
+### Library (small, backward-compatible)
+
+- WalkForward gained `mode="rolling" | "expanding"` (ml/validation.py).
+  Rolling is the default and byte-for-byte the old behavior. Expanding
+  pins the training window at the first date and grows it by `step` per
+  fold (`train_periods` is the initial size); the purge gap to the test
+  block is unchanged, so expanding only ever adds older data.
+- `coefficient_history(signal)` (ml/training.py): per-fold linear
+  coefficients, one row per fold indexed by its `test_start`, one column
+  per feature — the honest OOS picture of how combination weights
+  evolved. Raises ModelError on models without `coef_`.
+- `FundamentalDataset.coverage_table(item, index, symbols)`
+  (data/fundamentals.py): per-date `n_covered` / `n_universe` /
+  `pct_covered`, so sparse fundamental data is reported explicitly —
+  panels drop rows with any missing feature, and this table is how that
+  shrinkage stays visible.
+- 11 new tests (470 total), architecture.md sections 4.6/4.9 and README
+  updated.
+
+### Notebook: notebooks/factor_research.ipynb (new primary)
+
+Config-driven replacement for the single-purpose momentum notebook
+(momentum_research.ipynb is kept for reference, untouched):
+
+- Universe US_LARGE_CAP_149 (US_LARGE_CAP_150 minus MMC, Yahoo data
+  issue), configurable dates, rebalance frequency, and factor subset
+  from a catalog of 11 price + 8 fundamental (CP7 value/quality/growth)
+  factors; selection validated before any download.
+- Mode "single": one-factor long/short costed backtest (the old
+  workflow, generalized to any factor).
+- Mode "ml": ranked forward-return target (`target_transform="rank"`)
+  -> walk-forward Ridge (`LinearModel`) -> continuous OOS signal;
+  outputs OOS rank IC and costed-backtest comparisons of the blend vs
+  EVERY selected single-factor baseline on identical OOS dates, plus a
+  Ridge weight-evolution chart saved as its own PNG.
+- Fundamental honesty: statements fetched from START minus 2 years (TTM
+  warmup), `strict=False` so uncovered names drop with a warning,
+  per-item coverage change-point tables, per-feature coverage summary,
+  and an explicit requested-vs-covered panel date-range printout.
+- Conventions kept from the old notebook: RUN_NAME, cached data reuse,
+  timestamped tearsheet PNGs under outputs/.
+
+Design note, deliberate: **Ridge is the first rung of the model
+ladder** — linear, regularized, interpretable, with weight evolution as
+a first-class output. Gradient boosting and stacked ensembles are
+planned future comparisons, to be run only after the Ridge baseline on
+real data is understood (roadmap §3 discipline: one walk-forward per
+finalized configuration, every run counted).
+
+Validation: the notebook's exact cell logic was executed end-to-end on
+the synthetic market in both modes before authoring; the ML sanity
+result matched Checkpoint 8 (blend OOS rank IC below raw momentum's,
+fundamentals contributing ~nothing — correct on synthetic data).
+
+Known limits: real-data caches are machine-local (see Environment); a
+fresh Yahoo fundamental fetch covers only ~4-6 trailing quarters, so
+multi-year fundamental ML runs wait on cache accumulation (roadmap
+Appendix A); every result on US_LARGE_CAP_149 carries the survivorship
+caveat.
+
+
 # Current Development Stage
 
 There is no active checkpoint. The architecture.md contract (sections
 4.1 through 4.9: data, research, backtest, portfolio, risk, ml,
 analytics, viz, fundamentals) is fully built, tested, and documented.
+
+Real-data factor experiments (single or ML-combined) now run through
+notebooks/factor_research.ipynb; the next model rungs to compare against
+the Ridge baseline there are gradient boosting and stacked ensembles.
 
 docs/research_roadmap.md is the plan of record for future work:
 
