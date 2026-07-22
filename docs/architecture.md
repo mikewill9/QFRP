@@ -214,8 +214,13 @@ Rules:
   `feature_importances_` may return None); `LinearModel` (ridge),
   `TreeModel` (random forest; single-threaded by default for bit-exact
   determinism), `GradientBoostingModel` (lightgbm if available else
-  sklearn, chosen at fit time), `EnsembleModel(models, weights)`.
-  Wrappers validate prediction columns against training columns.
+  sklearn, chosen at fit time; `subsample < 1` enables stochastic
+  gradient boosting — row bagging per tree — as regularization),
+  `EnsembleModel(models, weights)`. Wrappers validate prediction columns
+  against training columns. In `notebooks/factor_research.ipynb`,
+  `GradientBoostingModel` is the challenger to the Ridge baseline
+  (`ML_MODEL = "ridge" | "gbm"`); both run through the identical
+  purged walk-forward machinery — splitters are model-agnostic.
 - `training.py`: `WalkForwardTrainer(model_factory, splitter).run(panel) ->
   TrainedSignal` with the OOS prediction wide frame, per-fold date
   ranges, and the fitted models. Only WalkForward output is causal
@@ -223,6 +228,9 @@ Rules:
   `coefficient_history(signal) -> DataFrame` (one row per fold indexed
   by `test_start`, one column per feature) exposes how a linear model's
   combination weights evolved; raises on models without `coef_`.
+  `importance_history(signal)` is the tree-model analogue in the same
+  frame format (non-negative, unsigned; sklearn tree importances sum to
+  one per fold); raises on models whose `feature_importances_` is None.
 - `evaluation.py`: `regression_metrics(y_true, y_pred)`,
   `prediction_rank_ic(predictions, prices, horizon)` (reuses the
   research layer's IC machinery), `permutation_importance(model, X, y)`.

@@ -27,7 +27,12 @@ from quantlab.ml.models import ModelWrapper
 from quantlab.ml.validation import PurgedKFold, WalkForward
 from quantlab.types import WideFrame
 
-__all__ = ["TrainedSignal", "WalkForwardTrainer", "coefficient_history"]
+__all__ = [
+    "TrainedSignal",
+    "WalkForwardTrainer",
+    "coefficient_history",
+    "importance_history",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +162,37 @@ def coefficient_history(signal: TrainedSignal) -> pd.DataFrame:
                 "coefficient_history needs linear models (LinearModel)"
             )
         rows.append(coef)
+    history = pd.DataFrame(rows)
+    history.index = pd.DatetimeIndex(signal.folds["test_start"], name="test_start")
+    return history.reindex(columns=signal.feature_names)
+
+
+def importance_history(signal: TrainedSignal) -> pd.DataFrame:
+    """Per-fold feature importances: one row per fold, one column per feature.
+
+    The tree-model analogue of :func:`coefficient_history`, in the same
+    frame format (rows indexed by each fold's ``test_start``, columns in
+    ``feature_names`` order), so the same plotting code reads either.
+    Two differences to keep in mind when reading the chart:
+
+    - importances are non-negative and carry no sign — they say a feature
+      mattered, never in which direction;
+    - scales differ by model: sklearn tree importances are normalized to
+      sum to one per fit, ``LinearModel`` reports ``|coefficient|``.
+
+    Raises :class:`ModelError` when any fold's model reports no
+    importances (``feature_importances_`` is ``None``).
+    """
+    rows: list[pd.Series] = []
+    for position, model in enumerate(signal.models):
+        importances = model.feature_importances_
+        if importances is None:
+            raise ModelError(
+                f"Fold {position} model {type(model).__name__} reports no "
+                "feature importances; importance_history needs models with "
+                "feature_importances_"
+            )
+        rows.append(importances)
     history = pd.DataFrame(rows)
     history.index = pd.DatetimeIndex(signal.folds["test_start"], name="test_start")
     return history.reindex(columns=signal.feature_names)

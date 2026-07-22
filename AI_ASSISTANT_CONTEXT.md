@@ -63,8 +63,34 @@ Research/factor system
 Checkpoint 3:
 Backtesting engine
 
+Checkpoint 4:
+Portfolio and risk layer
+
+Checkpoint 5:
+ML alpha pipeline
+
+Checkpoint 6:
+Visualization and attribution
+
+Checkpoint 7:
+Point-in-time fundamental data and fundamental factors
+
+Checkpoint 8:
+Multi-factor ML combination
+
+Checkpoint 9:
+Point-in-time universe expansion
+
+Checkpoint 10:
+ML combination wiring and the general factor research notebook
+
+Checkpoint 11:
+Gradient boosting challenger (ML_MODEL config in the research notebook)
+
 Current development:
-Portfolio construction and risk management
+Real-data factor research through notebooks/factor_research.ipynb
+(Ridge baseline vs gradient boosting challenger); next roadmap stages
+are data-gated (see PROJECT_HANDOFF.md and docs/research_roadmap.md)
 
 ---
 

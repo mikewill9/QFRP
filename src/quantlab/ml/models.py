@@ -175,12 +175,18 @@ class GradientBoostingModel(_BaseWrapper):
         n_estimators: int = 200,
         learning_rate: float = 0.05,
         max_depth: int = 3,
+        subsample: float = 1.0,
         random_state: int | None = None,
     ) -> None:
         super().__init__()
+        if not 0.0 < subsample <= 1.0:
+            raise ModelError(f"subsample must be in (0, 1], got {subsample}")
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
         self.max_depth = max_depth
+        # subsample < 1 fits each tree on a random row fraction (stochastic
+        # gradient boosting) — regularization for low signal-to-noise panels.
+        self.subsample = subsample
         self.random_state = _resolve_seed(random_state)
         self._backend: str | None = None
 
@@ -198,6 +204,9 @@ class GradientBoostingModel(_BaseWrapper):
                 n_estimators=self.n_estimators,
                 learning_rate=self.learning_rate,
                 max_depth=self.max_depth,
+                subsample=self.subsample,
+                # LightGBM ignores subsample unless bagging is enabled.
+                subsample_freq=1 if self.subsample < 1.0 else 0,
                 random_state=self.random_state,
                 verbosity=-1,
             )
@@ -209,6 +218,7 @@ class GradientBoostingModel(_BaseWrapper):
                 n_estimators=self.n_estimators,
                 learning_rate=self.learning_rate,
                 max_depth=self.max_depth,
+                subsample=self.subsample,
                 random_state=self.random_state,
             )
 

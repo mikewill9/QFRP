@@ -16,7 +16,12 @@ from quantlab.ml.models import (
 )
 from quantlab.ml.persistence import ModelRegistry
 from quantlab.ml.selection import compare_models
-from quantlab.ml.training import TrainedSignal, WalkForwardTrainer, coefficient_history
+from quantlab.ml.training import (
+    TrainedSignal,
+    WalkForwardTrainer,
+    coefficient_history,
+    importance_history,
+)
 from quantlab.ml.validation import PurgedKFold, WalkForward
 
 __all__ = [
@@ -35,6 +40,7 @@ __all__ = [
     "build_features",
     "coefficient_history",
     "compare_models",
+    "importance_history",
     "permutation_importance",
     "prediction_rank_ic",
     "regression_metrics",

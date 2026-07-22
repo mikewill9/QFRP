@@ -32,6 +32,7 @@ The long-term goal is to demonstrate:
 
 Completed checkpoints:
 
+- Checkpoint 11: gradient boosting challenger in the factor research notebook
 - Checkpoint 10: ML combination wiring and general factor research notebook
 - Checkpoint 9: point-in-time universe expansion (roadmap Stage 4)
 - Checkpoint 8: multi-factor ML combination (roadmap Stage 3)
@@ -59,7 +60,7 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (470 tests), `ruff check src tests examples`, `mypy`
+- Validate with: `python -m pytest` (484 tests), `ruff check src tests examples`, `mypy`
 - Everything runs offline on the synthetic market; no downloads needed
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
 - Real-data caches (`~/.quantlab/cache`) are machine-local and not in git.
@@ -392,15 +393,80 @@ Appendix A); every result on US_LARGE_CAP_149 carries the survivorship
 caveat.
 
 
+## Checkpoint 11: Gradient Boosting Challenger
+
+Completed: the second rung of the model ladder — gradient boosting as a
+config-selectable challenger to the Ridge baseline in
+notebooks/factor_research.ipynb.
+
+Scope note: the checkpoint was specified as a new
+`research/ml/gradient_boosting.py` with a `GradientBoostingAlphaModel`
+mirroring a `RidgeAlphaModel`. Neither existed — the repository (source
+of truth) already had `GradientBoostingModel` in `src/quantlab/ml/models.py`,
+with window modes living in `WalkForward` and purged CV in `PurgedKFold`,
+both model-agnostic. The checkpoint was therefore implemented as minimal
+extensions to the existing architecture rather than a parallel class.
+
+### Library (small, backward-compatible)
+
+- `GradientBoostingModel` gained `subsample: float = 1.0` (ml/models.py):
+  values below 1 enable stochastic gradient boosting (each tree fits a
+  random row fraction — regularization for low signal-to-noise panels).
+  The default reproduces the pre-CP11 model exactly (pinned by test);
+  out-of-range values raise ModelError. Passed to sklearn's
+  GradientBoostingRegressor directly; on the optional lightgbm backend it
+  maps to `subsample` + `subsample_freq=1`.
+- `importance_history(signal)` (ml/training.py): the tree-model analogue
+  of `coefficient_history`, same frame format (one row per fold indexed
+  by `test_start`, one column per feature), so the notebook's
+  weight-evolution chart reads either. Importances are non-negative and
+  unsigned (no direction information; sklearn normalizes to sum 1 per
+  fold); raises ModelError when a fold's model has no importances.
+- 14 new tests in tests/test_gradient_boosting.py (484 total): subsample
+  validation and backward-compat pins, determinism under subsampling,
+  challenger-hyperparameter signal recovery with finite predictions and
+  normalized importances, a hand-computed constant-target case, both
+  walk-forward window modes with causality assertions, PurgedKFold
+  compatibility (the purge machinery is structural and model-agnostic —
+  the GBM flows through it unchanged), and the importance_history
+  contract.
+
+### Notebook: notebooks/factor_research.ipynb
+
+- Step 1 config: `ML_MODEL = "ridge" | "gbm"` plus `GBM_PARAMS`
+  (challenger defaults `n_estimators=100, max_depth=3,
+  learning_rate=0.05, subsample=0.8` — shallow trees, slow learning,
+  row bagging; all editable in place). Invalid values raise.
+- Step 8 instantiates `LinearModel(alpha=RIDGE_ALPHA)` or
+  `GradientBoostingModel(**GBM_PARAMS)` from the config; the
+  walk-forward loop, purge gap, IC table, and baseline comparisons are
+  untouched and identical across models.
+- Step 10 plots `coefficient_history` (ridge, signed) or
+  `importance_history` (gbm, unsigned, sums to 1) with matching labels.
+- Output filenames now carry the model name in ml mode
+  (`..._ml_ridge_...` / `..._ml_gbm_...`, and the weights chart
+  `{RUN_NAME}_{ML_MODEL}_weights_...`); single mode is unchanged.
+
+Validation: the notebook's exact cell logic was executed end-to-end on
+the synthetic market for BOTH `ML_MODEL` settings before authoring;
+identical fold structures, finite OOS signals, and normalized GBM
+importances confirmed.
+
+Discipline reminder (roadmap §3): run the challenger only on a
+configuration whose Ridge baseline is already understood, and count
+every walk-forward. Small OOS gains over Ridge are within noise.
+
+
 # Current Development Stage
 
 There is no active checkpoint. The architecture.md contract (sections
 4.1 through 4.9: data, research, backtest, portfolio, risk, ml,
 analytics, viz, fundamentals) is fully built, tested, and documented.
 
-Real-data factor experiments (single or ML-combined) now run through
-notebooks/factor_research.ipynb; the next model rungs to compare against
-the Ridge baseline there are gradient boosting and stacked ensembles.
+Real-data factor experiments (single or ML-combined) run through
+notebooks/factor_research.ipynb with a config-selectable model
+(`ML_MODEL`: Ridge baseline or gradient boosting challenger, Checkpoint
+11); the next model rung to compare there is stacked ensembles.
 
 docs/research_roadmap.md is the plan of record for future work:
 
