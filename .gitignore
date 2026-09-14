@@ -28,3 +28,6 @@ notebooks/.ipynb_checkpoints/
 .DS_Store
 .idea/
 .vscode/
+
+.ipynb_checkpoints/
+Untitled*.ipynb
