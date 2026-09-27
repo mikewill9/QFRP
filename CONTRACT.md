@@ -26,9 +26,16 @@ the precomputed permutation results. Nothing in it is fabricated.
 
 ## 2. Design decisions
 
-**Fixed menu, precomputed results.** The app offers **11 price factors × 5
-date ranges = 55 configurations**. Fundamental factors (value, quality, growth)
+**Fixed menu, precomputed results.** The app offers **10 price factors × 5
+date ranges = 50 configurations**. Fundamental factors (value, quality, growth)
 are not offered: free data has no real fundamental history before ~2025.
+
+The runner computes 11 price factors (55 configurations); `roll_spread` is
+hidden from the app by `EXCLUDED_FACTORS` in `app/api.py`. Its estimator
+clamps spreads at zero, so ~54 of 148 stocks tie for the best score and the
+sort's tie-breaking — not the factor — picks the long leg, in the real
+portfolio and in every shuffle. That biases its null distribution (null means
+5–21 standard errors from zero), so its p-values are meaningless.
 
 All statistics are computed offline by `scripts/run_permutations.py`, one JSON
 file per configuration in `outputs/permutations/{factor}_{period}.json`. The app
@@ -39,7 +46,7 @@ ships the files somewhere else; `outputs/` is not in git).
 Rationale: one 20-year backtest takes ~1s, and each configuration runs 2,000
 shuffled backtests, so the full set is about an hour of compute. Precomputing
 makes the app instant. The tradeoff is that users cannot test arbitrary
-configurations, which is acceptable — 55 options is plenty for someone to hunt
+configurations, which is acceptable — 50 options is plenty for someone to hunt
 for a good-looking result, which is the point of the demo.
 
 **Verdict is computed at display time, not stored.** The multiple-testing
@@ -56,9 +63,10 @@ which is session state BP owns. So `get_analysis()` returns raw statistics, and
 
 ### `list_factors() -> list[FactorInfo]`
 
-The factor menu (the 11 price factors), for populating a dropdown. Comes from
-the same catalog the permutation runner uses
-(`quantlab.backtest.pipeline.PRICE_FACTOR_BUILDERS`).
+The factor menu (10 price factors), for populating a dropdown. Comes from the
+same catalog the permutation runner uses
+(`quantlab.backtest.pipeline.PRICE_FACTOR_BUILDERS`), minus
+`EXCLUDED_FACTORS`.
 
 ```
 FactorInfo
@@ -69,7 +77,7 @@ FactorInfo
 
 Keys: `momentum`, `ts_momentum`, `st_reversal`, `price_to_ma`,
 `realized_vol`, `ewma_vol`, `market_beta`, `pca_reversal`,
-`amihud_illiquidity`, `dollar_volume`, `roll_spread`.
+`amihud_illiquidity`, `dollar_volume`. (`roll_spread` is excluded — §2.)
 
 ### `list_periods() -> list[PeriodInfo]`
 
@@ -106,7 +114,7 @@ Errors:
 
 | Situation | Exception | Suggested HTTP |
 |---|---|---|
-| unknown `factor_key` or `period_key` | `KeyError` | 404 |
+| unknown `factor_key` or `period_key`, or an excluded factor (`roll_spread`) | `KeyError` | 404 |
 | valid keys, results file not written yet | `ResultNotComputedError` (a `KeyError` subclass — catch it first) | 503 |
 | `k` < 1 | `ValueError` | 422 |
 | `k` not an integer (incl. `True`) | `TypeError` | 422 |
@@ -150,6 +158,8 @@ AnalysisResult
 │   ├── p_value: float                # raw, one-sided, 0.0 to 1.0
 │   ├── adjusted_p_value: float       # bonferroni_adjust(p_value, k)
 │   ├── k: int                        # what adjusted_p_value accounts for
+│   ├── reverse_p_value: float        # worse-than-random test, raw (see §5)
+│   ├── adjusted_reverse_p_value: float  # bonferroni_adjust(reverse_p_value, k)
 │   └── null_turnover: float          # shuffled portfolios' annualized turnover
 │
 ├── Cost sensitivity (real strategy)
@@ -192,7 +202,7 @@ verdict explanation says so when that happens.
 | `n_trades` | `turnover` | trade counts depend on rebalance tolerance; turnover is the standard measure |
 | `equity_curve["benchmark"]` | removed | not in the precomputed results (open item) |
 | `CostPoint.total_return` | removed | only Sharpe is stored at 2x/3x |
-| — | `adjusted_p_value`, `k`, `n_dropped`, `null_turnover`, `names_per_year` | new |
+| — | `adjusted_p_value`, `k`, `n_dropped`, `null_turnover`, `names_per_year`, `reverse_p_value`, `adjusted_reverse_p_value` | new |
 
 ### Notes for BP
 
@@ -219,8 +229,14 @@ Verdict
 ├── raw_p_value: float   # same as result.p_value
 ├── adjusted_p_value: float  # bonferroni_adjust(raw_p_value, n_configs_viewed)
 ├── n_configs_viewed: int
-└── explanation: str     # plain English, 2-5 sentences, display under the verdict
+├── explanation: str     # plain English, 2-5 sentences, display under the verdict
+├── reversed: bool       # True: significantly WORSE than random (label is FAIL)
+├── raw_reverse_p_value: float       # same as result.reverse_p_value
+└── adjusted_reverse_p_value: float  # bonferroni_adjust(raw_reverse_p_value, n_configs_viewed)
 ```
+
+The three `reversed` fields are new; the existing six are unchanged, so a UI
+that ignores them keeps working.
 
 The adjusted p-value is banded (cutoffs are named constants `PASS_BELOW` and
 `FAIL_ABOVE` at the top of `app/api.py`):
@@ -234,7 +250,20 @@ The adjusted p-value is banded (cutoffs are named constants `PASS_BELOW` and
 The verdict judges the **signal** (gross significance). Profitability after
 costs is shown by `cost_stress`, and the explanation adds a note when the 1x
 Sharpe is zero or negative. When `n_configs_viewed` > 1 it also states what the
-verdict would be for a single test (the same bands applied to the raw p-value).
+verdict would be for a single test (the same logic applied to the raw p-values).
+
+**Reversed FAIL.** The shuffle test is one-sided: a strategy that did far
+*worse* than random also gets a high p-value and a FAIL, which would wrongly
+read as "no signal". So every verdict also runs the test the other way:
+`reverse_p_value = permutation_pvalue(-sharpe_gross, -null_sharpes_gross)`,
+adjusted with the same `n_configs_viewed`. If the adjusted reverse p-value is
+below `PASS_BELOW`, the label stays **FAIL** (so existing UI logic works), but
+`reversed` is `true`, the headline is "Consistently worse than random", and
+the explanation says the opposite strategy would have looked strong. Show it
+differently from an ordinary FAIL if you can.
+
+**Survivorship note.** `SURVIVORSHIP_NOTE` in `app/api.py` (empty for now) is
+appended to every PASS explanation once Michael writes it.
 
 `n_configs_viewed` must be an integer >= 1 (same errors as `k` in §3). Track it
 in frontend session state — increment it each time a new (factor, period) pair
@@ -248,7 +277,7 @@ configurations you look at, the more likely one of them looks good by chance,
 and the raw p-value doesn't account for that. Bonferroni (`p × k`, capped at
 1) is the simplest, most conservative correction. With 2,000 shuffles the
 smallest raw p-value is 1/2001 ≈ 0.0005, so a PASS is still reachable after
-viewing all 55 configurations only if no shuffle beat the real Sharpe.
+viewing all 50 configurations only if no shuffle beat the real Sharpe.
 
 ---
 
@@ -272,19 +301,19 @@ Michael does not edit `app/ui/`. BP does not edit anything else.
 
 - The server environment needs `quantlab` installed (`pip install -e .` from
   the repo root): `app/api.py` imports it.
-- The 55 result JSONs must be present on the server, at
+- The 50 result JSONs the app offers must be present on the server, at
   `outputs/permutations/` or wherever `QFRP_RESULTS_DIR` points.
 
 ---
 
 ## 8. Open items
 
-- [x] Which factors make the menu — the 11 price factors
+- [x] Which factors make the menu — 10 price factors (`roll_spread` excluded)
 - [x] Which date ranges — the 5 periods above
 - [x] PASS/FAIL/INCONCLUSIVE thresholds — §5
 - [x] `limitations` strings — drafted in `app/api.py`, Michael to review
 - [ ] Benchmark curve: an equal-weight long-only basket was in v1 but is not
       precomputed. Add a separate precompute step, or drop it from the UI.
 - [ ] BP: update `app/ui/server.py` and the Analyzer page to the v2 field names
-      (§4 "Changes from v1").
+      (§4 "Changes from v1"), and optionally show `reversed` verdicts (§5).
 - [ ] Decide how the result JSONs reach the deployed server.

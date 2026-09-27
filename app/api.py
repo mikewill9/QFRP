@@ -29,15 +29,18 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from quantlab.analytics.performance import annualized_vol
-from quantlab.analytics.significance import bonferroni_adjust
+from quantlab.analytics.significance import bonferroni_adjust, permutation_pvalue
 from quantlab.backtest.pipeline import PRICE_FACTOR_BUILDERS
 
 __all__ = [
+    "EXCLUDED_FACTORS",
     "FAIL_ABOVE",
     "PASS_BELOW",
+    "SURVIVORSHIP_NOTE",
     "AnalysisResult",
     "CostPoint",
     "FactorInfo",
@@ -65,6 +68,21 @@ __all__ = [
 #   adjusted p >  FAIL_ABOVE               -> FAIL
 PASS_BELOW = 0.05
 FAIL_ABOVE = 0.20
+
+# Factors computed by the permutation runner but NOT offered in the app.
+#
+# roll_spread: Roll's estimator clamps the spread at zero, so on a typical
+# rebalance date ~54 of 148 stocks tie at the best score while the long leg
+# holds only 30. Which tied stocks get bought is then decided by how the sort
+# breaks ties (effectively by column/sector order), not by the factor -- in
+# the real portfolio AND in every shuffle. The shuffled long legs are skewed
+# (e.g. Energy 1% vs 6% of the universe), so the null distribution is biased
+# (null means 5-21 standard errors from zero) and the p-value is meaningless.
+# It stays in PRICE_FACTOR_BUILDERS; it is only hidden here.
+EXCLUDED_FACTORS: tuple[str, ...] = ("roll_spread",)
+
+# Appended to every PASS explanation when non-empty (text by Michael).
+SURVIVORSHIP_NOTE = ""
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_RESULTS_DIR = _REPO_ROOT / "outputs" / "permutations"
@@ -121,6 +139,9 @@ class AnalysisResult:
     p_value: float  # raw, one-sided
     adjusted_p_value: float  # bonferroni_adjust(p_value, k)
     k: int  # number of configurations the adjustment accounts for
+    # "worse than random" test: same shuffles, opposite direction
+    reverse_p_value: float  # permutation_pvalue(-sharpe_gross, -nulls)
+    adjusted_reverse_p_value: float  # bonferroni_adjust(reverse_p_value, k)
     null_turnover: float  # annualized turnover of the shuffled portfolios
     # cost sensitivity of the real strategy
     cost_stress: list[CostPoint]
@@ -138,6 +159,10 @@ class Verdict:
     adjusted_p_value: float
     n_configs_viewed: int
     explanation: str
+    # True when the strategy did significantly WORSE than random (label stays FAIL)
+    reversed: bool
+    raw_reverse_p_value: float
+    adjusted_reverse_p_value: float  # bonferroni_adjust(raw_reverse_p_value, n)
 
 
 class ResultNotComputedError(KeyError):
@@ -157,7 +182,8 @@ class ResultNotComputedError(KeyError):
 # --------------------------------------------------------------------------
 
 # Display text only. The keys and their order come from
-# PRICE_FACTOR_BUILDERS; the check below fails loudly if the two drift.
+# PRICE_FACTOR_BUILDERS minus EXCLUDED_FACTORS; the check below fails loudly
+# if they drift.
 _FACTOR_TEXT: dict[str, tuple[str, str]] = {
     "momentum": (
         "Momentum (12-1)",
@@ -206,16 +232,14 @@ _FACTOR_TEXT: dict[str, tuple[str, str]] = {
         "Dollar Volume",
         "Buys the most heavily traded stocks and sells the least traded.",
     ),
-    "roll_spread": (
-        "Roll Spread",
-        "Buys stocks with the tightest estimated bid-ask spreads and sells "
-        "those with the widest.",
-    ),
 }
-if list(_FACTOR_TEXT) != list(PRICE_FACTOR_BUILDERS):
+if not set(EXCLUDED_FACTORS) <= set(PRICE_FACTOR_BUILDERS):
+    raise RuntimeError(f"EXCLUDED_FACTORS not in the catalog: {EXCLUDED_FACTORS}")
+_MENU_FACTORS: list[str] = [k for k in PRICE_FACTOR_BUILDERS if k not in EXCLUDED_FACTORS]
+if list(_FACTOR_TEXT) != _MENU_FACTORS:
     raise RuntimeError(
-        "app/api.py factor text is out of sync with PRICE_FACTOR_BUILDERS: "
-        f"{sorted(set(_FACTOR_TEXT) ^ set(PRICE_FACTOR_BUILDERS))}"
+        "app/api.py factor text is out of sync with PRICE_FACTOR_BUILDERS minus "
+        f"EXCLUDED_FACTORS: {sorted(set(_FACTOR_TEXT) ^ set(_MENU_FACTORS))}"
     )
 
 
@@ -243,8 +267,8 @@ def _period_info(key: str) -> PeriodInfo:
 
 
 def list_factors() -> list[FactorInfo]:
-    """The factor menu (the 11 price factors), in display order."""
-    return [FactorInfo(key, *_FACTOR_TEXT[key]) for key in PRICE_FACTOR_BUILDERS]
+    """The factor menu (10 price factors: the catalog minus EXCLUDED_FACTORS)."""
+    return [FactorInfo(key, *_FACTOR_TEXT[key]) for key in _MENU_FACTORS]
 
 
 def list_periods() -> list[PeriodInfo]:
@@ -272,10 +296,13 @@ def _check_k(k: Any, name: str) -> int:
 
 
 def _validate_keys(factor_key: str, period_key: str) -> None:
-    if factor_key not in PRICE_FACTOR_BUILDERS:
+    if factor_key in EXCLUDED_FACTORS:
         raise KeyError(
-            f"unknown factor_key {factor_key!r}; valid: {list(PRICE_FACTOR_BUILDERS)}"
+            f"factor_key {factor_key!r} is excluded from the app (see EXCLUDED_FACTORS "
+            f"in app/api.py); valid: {_MENU_FACTORS}"
         )
+    if factor_key not in _MENU_FACTORS:
+        raise KeyError(f"unknown factor_key {factor_key!r}; valid: {_MENU_FACTORS}")
     if period_key not in _PERIOD_DATES:
         raise KeyError(f"unknown period_key {period_key!r}; valid: {list(_PERIOD_DATES)}")
 
@@ -362,6 +389,12 @@ def get_analysis(factor_key: str, period_key: str, k: int = 1) -> AnalysisResult
 
     nulls = [float(x) for x in record["null_sharpes_gross"] if x is not None]
     p_value = float(record["p_value"])
+    sharpe_gross = _finite(record["sharpe_gross"])
+    if sharpe_gross is None:  # the runner can't produce this; permutation_pvalue raises on NaN
+        raise ValueError(f"{factor_key}_{period_key}.json has no finite sharpe_gross")
+    # Worse-than-random test: flip the sign of every Sharpe, so "at least as
+    # large" becomes "at least as small". Same hand-written p-value function.
+    reverse_p_value, _ = permutation_pvalue(-sharpe_gross, -np.asarray(nulls, dtype=float))
 
     return AnalysisResult(
         factor_key=factor_key,
@@ -376,13 +409,15 @@ def get_analysis(factor_key: str, period_key: str, k: int = 1) -> AnalysisResult
         hit_rate=float(record["hit_rate_1x"]),
         turnover=float(record["turnover_annualized_1x"]),
         equity_curve=(equity / equity.iloc[0]).to_frame("strategy"),
-        sharpe_gross=_finite(record["sharpe_gross"]),
+        sharpe_gross=sharpe_gross,
         null_sharpes_gross=nulls,
         n_permutations=int(record["n_shuffles"]),
         n_dropped=int(record["n_dropped"]),
         p_value=p_value,
         adjusted_p_value=bonferroni_adjust(p_value, k),
         k=k,
+        reverse_p_value=float(reverse_p_value),
+        adjusted_reverse_p_value=bonferroni_adjust(float(reverse_p_value), k),
         null_turnover=float(record["null_turnover_annualized_mean"]),
         cost_stress=[
             CostPoint(multiplier=m, sharpe=_finite(record[f"sharpe_{m:g}x"]))
@@ -421,18 +456,32 @@ def _share_below(result: AnalysisResult) -> str:
     return f"{share:.1f}".removesuffix(".0")
 
 
+def _is_reversed(label: str, adjusted_reverse_p: float) -> bool:
+    """Significantly WORSE than random: a FAIL whose reverse p clears PASS_BELOW."""
+    return label == "FAIL" and adjusted_reverse_p < PASS_BELOW
+
+
 def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
     """Adjust ``result.p_value`` for ``n_configs_viewed`` tests and band it.
 
     The verdict is about the SIGNAL (gross of costs): does the factor's
     ranking of stocks beat random rankings? Whether it makes money after
     costs is a separate question, noted in the explanation when it doesn't.
+
+    A FAIL is also checked in the other direction: if the strategy did
+    significantly WORSE than random (adjusted reverse p < PASS_BELOW) the
+    label stays FAIL but ``reversed`` is True and the text says so.
     Explanation wording by Michael.
     """
     n = _check_k(n_configs_viewed, "n_configs_viewed")
     raw_p = float(result.p_value)
     adjusted_p = bonferroni_adjust(raw_p, n)
     label, headline = _band(adjusted_p)
+    raw_rev = float(result.reverse_p_value)
+    adjusted_rev = bonferroni_adjust(raw_rev, n)
+    is_reversed = _is_reversed(label, adjusted_rev)
+    if is_reversed:
+        headline = "Consistently worse than random"
     tests = f"{n} test{'s' if n != 1 else ''}"
 
     if label == "PASS":
@@ -449,6 +498,12 @@ def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
             f"enough to rule out luck given the {tests} you've run. It might be "
             "real. This data can't tell."
         )
+    elif is_reversed:
+        explanation = (
+            "This strategy did consistently worse than random, beating only "
+            f"{_share_below(result)}% of {result.n_permutations:,} random versions. "
+            "The opposite strategy would have looked strong on this data."
+        )
     else:
         explanation = (
             "Random versions of this strategy did about as well or better. "
@@ -456,10 +511,15 @@ def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
         )
 
     if n > 1:
-        # Same banding, applied to the unadjusted p-value (a single test).
-        explanation += f" If this were your only test, the verdict would be {_band(raw_p)[0]}."
+        # Same logic applied to the unadjusted p-values (a single test).
+        single = _band(raw_p)[0]
+        if _is_reversed(single, raw_rev):
+            single += " (consistently worse than random)"
+        explanation += f" If this were your only test, the verdict would be {single}."
     if result.sharpe_1x is not None and result.sharpe_1x <= 0:
         explanation += " After realistic trading costs, this strategy lost money."
+    if label == "PASS" and SURVIVORSHIP_NOTE:
+        explanation += f" {SURVIVORSHIP_NOTE}"
 
     return Verdict(
         label=label,
@@ -468,4 +528,7 @@ def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
         adjusted_p_value=adjusted_p,
         n_configs_viewed=n,
         explanation=explanation,
+        reversed=is_reversed,
+        raw_reverse_p_value=raw_rev,
+        adjusted_reverse_p_value=adjusted_rev,
     )

@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
+import numpy as np
 import pandas as pd
 import pytest
+from app import api
 from app.api import (
+    EXCLUDED_FACTORS,
     FAIL_ABOVE,
     PASS_BELOW,
     ResultNotComputedError,
@@ -18,6 +21,7 @@ from app.api import (
 )
 
 from quantlab.analytics.performance import performance_summary
+from quantlab.analytics.significance import permutation_pvalue
 from quantlab.backtest.pipeline import PRICE_FACTOR_BUILDERS
 
 FACTOR, PERIOD = "momentum", "2020_2024"
@@ -75,8 +79,11 @@ def write(results_dir, record: dict) -> None:
 
 # ------------------------------------------------------------------ menus
 def test_menus_come_from_the_runner_sources():
-    assert [f.key for f in list_factors()] == list(PRICE_FACTOR_BUILDERS)
-    assert len(list_factors()) == 11
+    assert EXCLUDED_FACTORS == ("roll_spread",)
+    expected = [k for k in PRICE_FACTOR_BUILDERS if k not in EXCLUDED_FACTORS]
+    assert [f.key for f in list_factors()] == expected
+    assert len(list_factors()) == 10
+    assert "roll_spread" in PRICE_FACTOR_BUILDERS  # hidden, not deleted
     assert [p.key for p in list_periods()] == [
         "2005_2024",
         "2005_2009",
@@ -250,6 +257,12 @@ def test_unknown_factor_or_period(results_dir):
         get_analysis(FACTOR, "1990_1995")
 
 
+def test_excluded_factor_raises_even_if_results_exist(results_dir):
+    write(results_dir, fake_record(factor="roll_spread"))
+    with pytest.raises(KeyError, match="excluded from the app"):
+        get_analysis("roll_spread", PERIOD)
+
+
 @pytest.mark.parametrize("k", [0, -1])
 def test_k_below_one_raises(results_dir, k):
     write(results_dir, fake_record())
@@ -279,3 +292,96 @@ def test_mismatched_file_contents_raise(results_dir):
     (results_dir / f"{FACTOR}_{PERIOD}.json").write_text(json.dumps(record))
     with pytest.raises(ValueError, match="contains st_reversal"):
         get_analysis(FACTOR, PERIOD)
+
+
+# --------------------------------------------------------- reversed verdict
+# 99 nulls evenly spread over [-1, 1] and a real gross Sharpe of -2, below all
+# of them. Reverse test: negate everything, so the real value is +2 and no
+# negated null is >= 2 -> reverse p = (0 + 1) / (99 + 1) = 0.01.
+WORSE_NULLS = [float(x) for x in np.linspace(-1.0, 1.0, 99)]
+
+
+def worse_record(**overrides):
+    return fake_record(
+        p_value=1.0, sharpe_gross=-2.0, null_sharpes_gross=WORSE_NULLS, n_shuffles=99,
+        **overrides,
+    )
+
+
+def test_reverse_p_uses_permutation_pvalue_on_negated_sharpes(results_dir):
+    write(results_dir, worse_record())
+    r = get_analysis(FACTOR, PERIOD, k=3)
+    expected, _ = permutation_pvalue(2.0, -np.array(WORSE_NULLS))
+    assert r.reverse_p_value == expected == pytest.approx(0.01)
+    assert r.adjusted_reverse_p_value == pytest.approx(0.03)
+    # a tie counts toward the reverse p-value, just like the forward one
+    write(results_dir, fake_record(sharpe_gross=0.1, null_sharpes_gross=[0.1, 0.5, 0.9]))
+    assert get_analysis(FACTOR, PERIOD).reverse_p_value == pytest.approx(2 / 4)
+
+
+def test_reversed_fail(results_dir):
+    write(results_dir, worse_record())
+    v = verdict_for(get_analysis(FACTOR, PERIOD), 1)
+    assert v.label == "FAIL"
+    assert v.reversed is True
+    assert v.headline == "Consistently worse than random"
+    assert v.raw_reverse_p_value == v.adjusted_reverse_p_value == pytest.approx(0.01)
+    assert v.explanation == (
+        "This strategy did consistently worse than random, beating only 0% of 99 "
+        "random versions. The opposite strategy would have looked strong on this data."
+    )
+
+
+def test_normal_fail_is_not_reversed(results_dir):
+    write(results_dir, fake_record(p_value=0.5))  # reverse p = 1.0 for these nulls
+    v = verdict_for(get_analysis(FACTOR, PERIOD), 1)
+    assert v.label == "FAIL"
+    assert v.reversed is False
+    assert v.headline == "Indistinguishable from luck"
+    assert v.raw_reverse_p_value == 1.0
+    assert v.explanation.startswith("Random versions of this strategy did about as well")
+
+
+def test_reversed_at_k1_but_not_at_higher_k(results_dir):
+    write(results_dir, worse_record())
+    r = get_analysis(FACTOR, PERIOD)
+    assert verdict_for(r, 4).reversed is True  # 0.04 < 0.05
+    v = verdict_for(r, 5)  # 0.05 is not < 0.05
+    assert v.adjusted_reverse_p_value == pytest.approx(0.05)
+    assert v.label == "FAIL"
+    assert v.reversed is False
+    assert v.headline == "Indistinguishable from luck"
+    assert v.explanation == (
+        "Random versions of this strategy did about as well or better. There's no "
+        "evidence the signal is anything more than luck. If this were your only "
+        "test, the verdict would be FAIL (consistently worse than random)."
+    )
+
+
+def test_reversed_verdict_keeps_cost_warning(results_dir):
+    write(results_dir, worse_record(sharpe_1x=-0.5))
+    v = verdict_for(get_analysis(FACTOR, PERIOD), 2)
+    assert v.reversed is True
+    assert v.explanation.endswith(
+        "If this were your only test, the verdict would be FAIL (consistently worse "
+        "than random). After realistic trading costs, this strategy lost money."
+    )
+
+
+# ------------------------------------------------------ survivorship hook
+def test_survivorship_note_empty_by_default(results_dir):
+    assert api.SURVIVORSHIP_NOTE == ""
+    text = explain(results_dir, 0.01, 1)
+    assert text.endswith("before trading costs.")  # nothing appended, no stray space
+
+
+def test_survivorship_note_appends_to_pass_only(results_dir, monkeypatch):
+    monkeypatch.setattr(api, "SURVIVORSHIP_NOTE", "Survivorship note here.")
+    assert explain(results_dir, 0.01, 1).endswith(" before trading costs. Survivorship note here.")
+    assert explain(results_dir, 0.01, 2, sharpe_1x=-0.1).endswith(
+        "this strategy lost money. Survivorship note here."
+    )
+    assert "Survivorship note" not in explain(results_dir, 0.10, 1)  # INCONCLUSIVE
+    assert "Survivorship note" not in explain(results_dir, 0.5, 1)  # FAIL
+    write(results_dir, worse_record())
+    assert "Survivorship note" not in verdict_for(get_analysis(FACTOR, PERIOD), 1).explanation
