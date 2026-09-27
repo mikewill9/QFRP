@@ -1,7 +1,10 @@
+import math
+
 import numpy as np
 import pandas as pd
+import pytest
 
-from quantlab.analytics.significance import permute_within_date
+from quantlab.analytics.significance import permutation_pvalue, permute_within_date
 
 
 def make_series():
@@ -42,3 +45,28 @@ def test_single_value_unchanged():
     s = pd.Series([np.nan, 3.0, np.nan], index=["A", "B", "C"])
     result = permute_within_date(s, np.random.default_rng(0))
     pd.testing.assert_series_equal(result, s)
+
+def test_pvalue_hand_computed():
+    p, dropped = permutation_pvalue(1.0, np.array([0.5, 1.2, np.nan, 1.0, -0.3]))
+    assert math.isclose(p, 0.6)
+    assert dropped == 1
+
+
+def test_pvalue_all_ties():
+    p, _ = permutation_pvalue(1.0, np.array([1.0, 1.0, 1.0]))
+    assert math.isclose(p, 1.0)
+
+
+def test_pvalue_real_beats_all():
+    p, _ = permutation_pvalue(5.0, np.array([0.0, 1.0, 2.0]))
+    assert math.isclose(p, 0.25)
+
+
+def test_pvalue_all_nan_nulls_raises():
+    with pytest.raises(ValueError):
+        permutation_pvalue(1.0, np.array([np.nan, np.nan, np.nan]))
+
+
+def test_pvalue_nan_real_raises():
+    with pytest.raises(ValueError):
+        permutation_pvalue(np.nan, np.array([0.5, 1.0]))
