@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from quantlab.analytics.significance import permutation_pvalue, permute_within_date, bonferroni_adjust
+from quantlab.analytics.significance import (
+    bonferroni_adjust,
+    permutation_pvalue,
+    permute_within_date,
+)
 
 
 def make_series():
@@ -63,12 +67,12 @@ def test_pvalue_real_beats_all():
 
 
 def test_pvalue_all_nan_nulls_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="no valid"):
         permutation_pvalue(1.0, np.array([np.nan, np.nan, np.nan]))
 
 
 def test_pvalue_nan_real_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="NaN"):
         permutation_pvalue(np.nan, np.array([0.5, 1.0]))
 
 def test_bonferroni_basic():
@@ -84,11 +88,11 @@ def test_bonferroni_k_one_unchanged():
 
 
 def test_bonferroni_bad_k_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="positive integer"):
         bonferroni_adjust(.02, 0)
 
 
 def test_bonferroni_bad_p_raises():
     for bad_p in [np.nan, -1, 1.5]:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="probability"):
             bonferroni_adjust(bad_p, 5)

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+
 def permute_within_date(zscores: pd.Series, rng: np.random.Generator) -> pd.Series:
     """Shuffle one date's z-scores across stocks, leaving NaN entries in place."""
     out = zscores.copy()
@@ -14,7 +15,7 @@ def permute_within_date(zscores: pd.Series, rng: np.random.Generator) -> pd.Seri
 
 def permutation_pvalue(real_sharpe: float, null_sharpes: np.ndarray) -> tuple[float, int]:
     """One-sided p-value: share of null Sharpes at least as large as the real one.
-    
+
     Uses (count+1)/(n+1) so the p-value is never exactly zero.
     NaN null Sharpes are dropped, and the number dropped is returned.
     """
@@ -22,7 +23,7 @@ def permutation_pvalue(real_sharpe: float, null_sharpes: np.ndarray) -> tuple[fl
         raise ValueError("real_sharpe is NaN")
     null_sharpes = np.asarray(null_sharpes, dtype=float)
     valid = null_sharpes[~np.isnan(null_sharpes)]
-    n_dropped = len(null_sharpes) - len(valid)    
+    n_dropped = len(null_sharpes) - len(valid)
     if len(valid) == 0:
         raise ValueError("no valid null Sharpes to compare against")
     count = (valid >= real_sharpe).sum()
