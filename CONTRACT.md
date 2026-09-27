@@ -219,7 +219,7 @@ Verdict
 ├── raw_p_value: float   # same as result.p_value
 ├── adjusted_p_value: float  # bonferroni_adjust(raw_p_value, n_configs_viewed)
 ├── n_configs_viewed: int
-└── explanation: str     # 1-3 sentences for display under the verdict
+└── explanation: str     # plain English, 2-5 sentences, display under the verdict
 ```
 
 The adjusted p-value is banded (cutoffs are named constants `PASS_BELOW` and
@@ -233,7 +233,8 @@ The adjusted p-value is banded (cutoffs are named constants `PASS_BELOW` and
 
 The verdict judges the **signal** (gross significance). Profitability after
 costs is shown by `cost_stress`, and the explanation adds a note when the 1x
-Sharpe is zero or negative.
+Sharpe is zero or negative. When `n_configs_viewed` > 1 it also states what the
+verdict would be for a single test (the same bands applied to the raw p-value).
 
 `n_configs_viewed` must be an integer >= 1 (same errors as `k` in §3). Track it
 in frontend session state — increment it each time a new (factor, period) pair

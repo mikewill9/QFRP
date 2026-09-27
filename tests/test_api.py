@@ -167,11 +167,78 @@ def test_cutoff_constants():
     assert (PASS_BELOW, FAIL_ABOVE) == (0.05, 0.20)
 
 
-def test_verdict_flags_losing_after_costs(results_dir):
-    write(results_dir, fake_record(sharpe_1x=-0.1))
-    assert "zero or negative" in verdict_for(get_analysis(FACTOR, PERIOD), 1).explanation
-    write(results_dir, fake_record(sharpe_1x=0.4))
-    assert "zero or negative" not in verdict_for(get_analysis(FACTOR, PERIOD), 1).explanation
+# ----------------------------------------------------------- verdict text
+ONLY_TEST = " If this were your only test, the verdict would be"
+COST_WARNING = " After realistic trading costs, this strategy lost money."
+
+
+def explain(results_dir, p_value, k, **overrides):
+    write(results_dir, fake_record(**overrides))
+    return verdict_for(replace(get_analysis(FACTOR, PERIOD), p_value=p_value), k).explanation
+
+
+def test_pass_text_single_test(results_dir):
+    # fake nulls (NaN dropped): 0.1, -0.2, 0.3 -- all below sharpe_gross 0.9
+    assert explain(results_dir, 0.01, 1) == (
+        "This strategy beat 100% of 4 random versions of itself. Even counting "
+        "the 1 test you've run this session, luck alone would rarely produce a "
+        "result this strong. That's evidence the signal is real, before trading "
+        "costs."
+    )
+
+
+def test_pass_share_counts_nulls_strictly_below_and_rounds_down(results_dir):
+    # vs sharpe_gross 0.9: 2 of 4 below (a tie at 0.9 doesn't count) -> "50"
+    text = explain(results_dir, 0.01, 1, null_sharpes_gross=[0.1, 0.9, 1.0, -0.5])
+    assert text.startswith("This strategy beat 50% of 4 random versions")
+    # 2 of 3 below -> 66.67% rounded DOWN -> "66.6"
+    text = explain(results_dir, 0.01, 1, null_sharpes_gross=[0.1, 1.0, -0.5])
+    assert text.startswith("This strategy beat 66.6% of 4 random versions")
+
+
+def test_pass_text_with_k(results_dir):
+    text = explain(results_dir, 0.01, 3)  # adjusted 0.03 -> PASS
+    assert "Even counting the 3 tests you've run this session" in text
+    assert text.endswith(f"{ONLY_TEST} PASS.")
+
+
+def test_inconclusive_text(results_dir):
+    assert explain(results_dir, 0.10, 1) == (
+        "This strategy did better than most random versions, but not by enough "
+        "to rule out luck given the 1 test you've run. It might be real. This "
+        "data can't tell."
+    )
+    text = explain(results_dir, 0.03, 2)  # adjusted 0.06 -> INCONCLUSIVE
+    assert "given the 2 tests you've run." in text
+    assert text.endswith(f"{ONLY_TEST} PASS.")  # 0.03 on its own passes
+
+
+def test_fail_text(results_dir):
+    assert explain(results_dir, 0.5, 1) == (
+        "Random versions of this strategy did about as well or better. There's "
+        "no evidence the signal is anything more than luck."
+    )
+    assert explain(results_dir, 0.15, 2).endswith(f"{ONLY_TEST} INCONCLUSIVE.")  # 0.30
+    assert explain(results_dir, 0.5, 3).endswith(f"{ONLY_TEST} FAIL.")
+
+
+def test_only_test_line_appears_only_when_k_above_one(results_dir):
+    assert ONLY_TEST not in explain(results_dir, 0.01, 1)
+    assert ONLY_TEST not in explain(results_dir, 0.5, 1)
+    assert ONLY_TEST in explain(results_dir, 0.5, 2)
+
+
+@pytest.mark.parametrize(
+    ("sharpe_1x", "warned"), [(-0.1, True), (0.0, True), (0.4, False), (None, False)]
+)
+def test_cost_warning(results_dir, sharpe_1x, warned):
+    for p_value in (0.01, 0.10, 0.5):  # added to every verdict label
+        assert explain(results_dir, p_value, 1, sharpe_1x=sharpe_1x).endswith(COST_WARNING) == warned
+
+
+def test_cost_warning_comes_after_only_test_line(results_dir):
+    text = explain(results_dir, 0.03, 2, sharpe_1x=-0.1)
+    assert text.endswith(f"{ONLY_TEST} PASS.{COST_WARNING}")
 
 
 # ------------------------------------------------------------- bad inputs

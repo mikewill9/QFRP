@@ -398,36 +398,68 @@ def get_analysis(factor_key: str, period_key: str, k: int = 1) -> AnalysisResult
 # --------------------------------------------------------------------------
 
 
+def _band(adjusted_p: float) -> tuple[str, str]:
+    """(label, headline) for an adjusted p-value, using the cutoffs above."""
+    if adjusted_p < PASS_BELOW:
+        return "PASS", "Signal beats random rankings"
+    if adjusted_p <= FAIL_ABOVE:
+        return "INCONCLUSIVE", "Not enough evidence either way"
+    return "FAIL", "Indistinguishable from luck"
+
+
+def _share_below(result: AnalysisResult) -> str:
+    """Percent of null Sharpes strictly below the real gross Sharpe, e.g. "97.3".
+
+    Rounded DOWN to one decimal so the text never overstates: "100" only
+    when every shuffle did worse.
+    """
+    nulls = result.null_sharpes_gross
+    if result.sharpe_gross is None or not nulls:
+        return "0"
+    below = sum(1 for x in nulls if x < result.sharpe_gross)
+    share = math.floor(1000 * below / len(nulls)) / 10
+    return f"{share:.1f}".removesuffix(".0")
+
+
 def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
     """Adjust ``result.p_value`` for ``n_configs_viewed`` tests and band it.
 
     The verdict is about the SIGNAL (gross of costs): does the factor's
     ranking of stocks beat random rankings? Whether it makes money after
     costs is a separate question, noted in the explanation when it doesn't.
+    Explanation wording by Michael.
     """
     n = _check_k(n_configs_viewed, "n_configs_viewed")
     raw_p = float(result.p_value)
     adjusted_p = bonferroni_adjust(raw_p, n)
+    label, headline = _band(adjusted_p)
+    tests = f"{n} test{'s' if n != 1 else ''}"
 
-    if adjusted_p < PASS_BELOW:
-        label, headline = "PASS", "Signal beats random rankings"
-    elif adjusted_p <= FAIL_ABOVE:
-        label, headline = "INCONCLUSIVE", "Not enough evidence either way"
-    else:
-        label, headline = "FAIL", "Indistinguishable from luck"
-
-    explanation = (
-        f"Before trading costs, about {raw_p:.1%} of {result.n_permutations:,} random "
-        f"reshufflings of this factor's rankings did as well or better (raw p = "
-        f"{raw_p:.4f}). You have viewed {n} configuration{'s' if n != 1 else ''}, "
-        f"which raises the chance one looks good by accident; adjusted for that "
-        f"(p x {n}, capped at 1), p = {adjusted_p:.4f}."
-    )
-    if result.sharpe_1x is None or result.sharpe_1x <= 0:
-        explanation += (
-            " Note: after modelled trading costs the strategy's Sharpe ratio was "
-            "zero or negative."
+    if label == "PASS":
+        explanation = (
+            f"This strategy beat {_share_below(result)}% of "
+            f"{result.n_permutations:,} random versions of itself. Even counting "
+            f"the {tests} you've run this session, luck alone would rarely produce "
+            "a result this strong. That's evidence the signal is real, before "
+            "trading costs."
         )
+    elif label == "INCONCLUSIVE":
+        explanation = (
+            "This strategy did better than most random versions, but not by "
+            f"enough to rule out luck given the {tests} you've run. It might be "
+            "real. This data can't tell."
+        )
+    else:
+        explanation = (
+            "Random versions of this strategy did about as well or better. "
+            "There's no evidence the signal is anything more than luck."
+        )
+
+    if n > 1:
+        # Same banding, applied to the unadjusted p-value (a single test).
+        explanation += f" If this were your only test, the verdict would be {_band(raw_p)[0]}."
+    if result.sharpe_1x is not None and result.sharpe_1x <= 0:
+        explanation += " After realistic trading costs, this strategy lost money."
 
     return Verdict(
         label=label,
