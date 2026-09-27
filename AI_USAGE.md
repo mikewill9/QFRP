@@ -13,12 +13,14 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - Backtest pipeline extraction (pipeline.py)
 - Permutation runner (run_permutations.py)
 - Data extension to 2005, EA removal
-- app/api.py
+- app/api.py, including reversed-verdict logic and roll_spread exclusion
 - CONTRACT.md
+- Shipping precomputed results
 
-## Frontend (BP)
-- Hand-written: [BP fills in]
-- AI-assisted: Analyzer page
+## Drafted with Claude (chat), edited and approved by Michael
+- Verdict text, reversed-verdict text, survivorship note
+- LIMITATIONS.md
+- Weekly plans and messages to BP
 
-## Methodology decisions (ours, not AI's)
- zero-cost significance test, Bonferroni, verdict cutoffs
+## Methodology decisions (made by Michael after reviewing options with Claude)
+- Zero-cost significance test, Bonferroni correction, verdict cutoffs, dropping roll_spread, featuring the survivorship result
