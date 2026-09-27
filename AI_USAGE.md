@@ -14,6 +14,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - Permutation runner (run_permutations.py)
 - Data extension to 2005, EA removal
 - app/api.py
+- CONTRACT.md
 
 ## Frontend (BP)
 - Hand-written: [BP fills in]
