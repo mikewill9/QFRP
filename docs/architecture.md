@@ -147,6 +147,13 @@ Rules:
   `run() -> BacktestResult` with `equity_curve`, `returns`, `weights`,
   `positions`, `trades`, `costs_paid`, and `summary()` (delegates to
   analytics).
+- Shared research convention (`pipeline.py`), used by
+  `notebooks/factor_research.ipynb` and `scripts/`: `TICKERS` (148 names),
+  `DATA_START` (2004-01-01 price warmup), the portfolio/cost constants,
+  `PRICE_FACTOR_BUILDERS` (the 11 price factors), `normalization()`
+  (winsorize + z-score), `make_execution(cost_multiplier)` (scales spread
+  and commission, not impact), and `run_ls_backtest(signal, ds,
+  cost_multiplier=1.0)`. Lives in `backtest` because it imports `research`.
 
 ### 4.4 portfolio (complete)
 
