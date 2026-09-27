@@ -83,7 +83,12 @@ FAIL_ABOVE = 0.20
 EXCLUDED_FACTORS: tuple[str, ...] = ("roll_spread",)
 
 # Appended to every PASS explanation when non-empty (text by Michael).
-SURVIVORSHIP_NOTE = ""
+SURVIVORSHIP_NOTE = (
+    "Caution: This test checks for luck, not for flawed data. Our stock list was "
+    "chosen in 2026, so it includes companies that grew into giants and leaves out "
+    "ones that failed. Strategies that favor small or risky stocks can look strong "
+    "partly because of this. Treat this PASS as a lead to investigate, not proof."
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_RESULTS_DIR = _REPO_ROOT / "results" / "permutations"

@@ -177,6 +177,7 @@ def test_cutoff_constants():
 # ----------------------------------------------------------- verdict text
 ONLY_TEST = " If this were your only test, the verdict would be"
 COST_WARNING = " After realistic trading costs, this strategy lost money."
+NOTE = f" {api.SURVIVORSHIP_NOTE}"  # appended to every PASS explanation
 
 
 def explain(results_dir, p_value, k, **overrides):
@@ -190,7 +191,7 @@ def test_pass_text_single_test(results_dir):
         "This strategy beat 100% of 4 random versions of itself. Even counting "
         "the 1 test you've run this session, luck alone would rarely produce a "
         "result this strong. That's evidence the signal is real, before trading "
-        "costs."
+        "costs." + NOTE
     )
 
 
@@ -206,7 +207,7 @@ def test_pass_share_counts_nulls_strictly_below_and_rounds_down(results_dir):
 def test_pass_text_with_k(results_dir):
     text = explain(results_dir, 0.01, 3)  # adjusted 0.03 -> PASS
     assert "Even counting the 3 tests you've run this session" in text
-    assert text.endswith(f"{ONLY_TEST} PASS.")
+    assert text.endswith(f"{ONLY_TEST} PASS.{NOTE}")
 
 
 def test_inconclusive_text(results_dir):
@@ -240,7 +241,11 @@ def test_only_test_line_appears_only_when_k_above_one(results_dir):
 )
 def test_cost_warning(results_dir, sharpe_1x, warned):
     for p_value in (0.01, 0.10, 0.5):  # added to every verdict label
-        assert explain(results_dir, p_value, 1, sharpe_1x=sharpe_1x).endswith(COST_WARNING) == warned
+        text = explain(results_dir, p_value, 1, sharpe_1x=sharpe_1x)
+        if p_value == 0.01:  # PASS: the survivorship note comes last
+            assert text.endswith(NOTE)
+            text = text.removesuffix(NOTE)
+        assert text.endswith(COST_WARNING) == warned
 
 
 def test_cost_warning_comes_after_only_test_line(results_dir):
@@ -369,8 +374,18 @@ def test_reversed_verdict_keeps_cost_warning(results_dir):
 
 
 # ------------------------------------------------------ survivorship hook
-def test_survivorship_note_empty_by_default(results_dir):
-    assert api.SURVIVORSHIP_NOTE == ""
+def test_survivorship_note_text():
+    assert api.SURVIVORSHIP_NOTE == (
+        "Caution: This test checks for luck, not for flawed data. Our stock list "
+        "was chosen in 2026, so it includes companies that grew into giants and "
+        "leaves out ones that failed. Strategies that favor small or risky stocks "
+        "can look strong partly because of this. Treat this PASS as a lead to "
+        "investigate, not proof."
+    )
+
+
+def test_survivorship_note_not_appended_when_empty(results_dir, monkeypatch):
+    monkeypatch.setattr(api, "SURVIVORSHIP_NOTE", "")
     text = explain(results_dir, 0.01, 1)
     assert text.endswith("before trading costs.")  # nothing appended, no stray space
 
