@@ -13,9 +13,10 @@ Where things come from, so nothing is defined twice:
 - the multiple-testing adjustment is
   ``quantlab.analytics.significance.bonferroni_adjust``.
 
-The results directory defaults to ``outputs/permutations`` at the repo root
-and can be overridden with the ``QFRP_RESULTS_DIR`` environment variable
-(used by the tests, and by a deployment that ships the JSONs elsewhere).
+The results directory defaults to ``results/permutations`` at the repo root
+(tracked in git: copies of the runner's ``outputs/permutations`` JSONs for
+the configurations the app offers) and can be overridden with the
+``QFRP_RESULTS_DIR`` environment variable (used by the tests).
 """
 
 from __future__ import annotations
@@ -85,7 +86,7 @@ EXCLUDED_FACTORS: tuple[str, ...] = ("roll_spread",)
 SURVIVORSHIP_NOTE = ""
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_RESULTS_DIR = _REPO_ROOT / "outputs" / "permutations"
+_DEFAULT_RESULTS_DIR = _REPO_ROOT / "results" / "permutations"
 
 
 # --------------------------------------------------------------------------
@@ -312,7 +313,8 @@ def _load_record(factor_key: str, period_key: str) -> dict[str, Any]:
     if not path.is_file():
         raise ResultNotComputedError(
             f"results for {factor_key} / {period_key} are not computed yet "
-            f"(expected {path}); run scripts/run_permutations.py"
+            f"(expected {path}); run scripts/run_permutations.py and copy the "
+            "JSON into results/permutations/"
         )
     record: dict[str, Any] = json.loads(path.read_text())
     if (record.get("factor"), record.get("period")) != (factor_key, period_key):

@@ -37,11 +37,13 @@ sort's tie-breaking — not the factor — picks the long leg, in the real
 portfolio and in every shuffle. That biases its null distribution (null means
 5–21 standard errors from zero), so its p-values are meaningless.
 
-All statistics are computed offline by `scripts/run_permutations.py`, one JSON
-file per configuration in `outputs/permutations/{factor}_{period}.json`. The app
-reads those files. It never runs a backtest. The directory can be overridden
-with the `QFRP_RESULTS_DIR` environment variable (e.g. for a deployment that
-ships the files somewhere else; `outputs/` is not in git).
+All statistics are computed offline by `scripts/run_permutations.py`, which
+writes one JSON per configuration to `outputs/permutations/` (not in git). The
+50 files the app offers are copied, unchanged, into
+**`results/permutations/{factor}_{period}.json`, which is tracked in git** and
+is the app's default results directory. The app reads those files. It never
+runs a backtest. The directory can be overridden with the `QFRP_RESULTS_DIR`
+environment variable.
 
 Rationale: one 20-year backtest takes ~1s, and each configuration runs 2,000
 shuffled backtests, so the full set is about an hour of compute. Precomputing
@@ -286,7 +288,8 @@ viewing all 50 configurations only if no shuffle beat the real Sharpe.
 ```
 src/quantlab/         # Michael only — the research library
 scripts/              # Michael only — run_permutations.py (the precompute)
-outputs/permutations/ # Michael only — precomputed results (not in git)
+outputs/permutations/ # Michael only — runner output, all 55 (not in git)
+results/permutations/ # Michael only — the 50 shipped results (in git)
 app/
 ├── api.py            # Michael only — the contract implementation
 └── ui/               # BP only — frontend and FastAPI server
@@ -301,8 +304,8 @@ Michael does not edit `app/ui/`. BP does not edit anything else.
 
 - The server environment needs `quantlab` installed (`pip install -e .` from
   the repo root): `app/api.py` imports it.
-- The 50 result JSONs the app offers must be present on the server, at
-  `outputs/permutations/` or wherever `QFRP_RESULTS_DIR` points.
+- The 50 result JSONs ship in the repo at `results/permutations/` (about
+  6 MB); a deployment from a git checkout has them automatically.
 
 ---
 
@@ -316,4 +319,5 @@ Michael does not edit `app/ui/`. BP does not edit anything else.
       precomputed. Add a separate precompute step, or drop it from the UI.
 - [ ] BP: update `app/ui/server.py` and the Analyzer page to the v2 field names
       (§4 "Changes from v1"), and optionally show `reversed` verdicts (§5).
-- [ ] Decide how the result JSONs reach the deployed server.
+- [x] How the result JSONs reach the deployed server — committed in
+      `results/permutations/`

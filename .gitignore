@@ -17,7 +17,10 @@ htmlcov/
 
 # quantlab runtime artifacts
 .quantlab/
-results/
+# results/ is for runtime artifacts, except the precomputed permutation
+# results the app ships with (read by app/api.py)
+results/*
+!results/permutations/
 outputs/
 *.log
 

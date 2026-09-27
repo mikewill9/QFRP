@@ -385,3 +385,16 @@ def test_survivorship_note_appends_to_pass_only(results_dir, monkeypatch):
     assert "Survivorship note" not in explain(results_dir, 0.5, 1)  # FAIL
     write(results_dir, worse_record())
     assert "Survivorship note" not in verdict_for(get_analysis(FACTOR, PERIOD), 1).explanation
+
+
+# ----------------------------------------------------------- shipped results
+def test_shipped_results_cover_every_menu_config(monkeypatch):
+    """results/permutations/ (the default directory) has a valid file for all 50."""
+    monkeypatch.delenv("QFRP_RESULTS_DIR", raising=False)
+    configs = [(f.key, p.key) for f in list_factors() for p in list_periods()]
+    assert len(configs) == 50
+    for factor, period in configs:
+        r = get_analysis(factor, period)
+        assert r.n_permutations == 2000
+        assert len(r.null_sharpes_gross) == 2000 - r.n_dropped
+        assert r.equity_curve["strategy"].iloc[0] == 1.0
