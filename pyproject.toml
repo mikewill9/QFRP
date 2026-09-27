@@ -55,6 +55,7 @@ packages = ["src/quantlab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # so tests can import app/ (the web API)
 addopts = "-q --strict-markers"
 markers = [
     "slow: long-running tests (deselect with '-m \"not slow\"')",

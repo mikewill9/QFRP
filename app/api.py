@@ -1,34 +1,73 @@
-"""Placeholder implementation of the QFRP app data contract.
+"""Real implementation of the QFRP app data contract (see CONTRACT.md).
 
-Returns made-up data in exactly the shape described in CONTRACT.md, so the
-frontend can be built before the real research and statistics layer exists.
+Reads the precomputed permutation-test results written by
+``scripts/run_permutations.py`` (one JSON per factor x period) and turns
+them into the shapes the web app displays. Nothing here runs a backtest:
+every call is a file read plus a few lines of arithmetic, so it is instant.
 
-    EVERY NUMBER PRODUCED BY THIS MODULE IS FABRICATED.
+Where things come from, so nothing is defined twice:
 
-Nothing here touches quantlab. Nothing here is research. This file is replaced
-wholesale in week 2 by an implementation that reads precomputed real results.
-The function names, argument names, and returned field names are the contract
-and will NOT change.
+- the factor menu is ``quantlab.backtest.pipeline.PRICE_FACTOR_BUILDERS``
+  (the catalog the permutation runner iterates over);
+- the period menu is ``PERIODS`` in ``scripts/run_permutations.py``;
+- the multiple-testing adjustment is
+  ``quantlab.analytics.significance.bonferroni_adjust``.
+
+The results directory defaults to ``outputs/permutations`` at the repo root
+and can be overridden with the ``QFRP_RESULTS_DIR`` environment variable
+(used by the tests, and by a deployment that ships the JSONs elsewhere).
 """
 
 from __future__ import annotations
 
+import importlib.util
+import json
+import math
+import os
 from dataclasses import dataclass
+from pathlib import Path
+from types import ModuleType
+from typing import Any
 
-import numpy as np
 import pandas as pd
 
+from quantlab.analytics.performance import annualized_vol
+from quantlab.analytics.significance import bonferroni_adjust
+from quantlab.backtest.pipeline import PRICE_FACTOR_BUILDERS
+
 __all__ = [
+    "FAIL_ABOVE",
+    "PASS_BELOW",
     "AnalysisResult",
     "CostPoint",
     "FactorInfo",
     "PeriodInfo",
+    "ResultNotComputedError",
     "Verdict",
     "get_analysis",
     "list_factors",
     "list_periods",
     "verdict_for",
 ]
+
+# --------------------------------------------------------------------------
+# Verdict cutoffs (applied to the multiple-testing-ADJUSTED p-value)
+# --------------------------------------------------------------------------
+# Why adjust at all: Harvey, Liu & Zhu (2016), "...and the Cross-Section of
+# Expected Returns" (Review of Financial Studies 29(1), 5-68), show that
+# once hundreds of factors have been tried, the usual p < 0.05 bar lets
+# through mostly false discoveries; a p-value only means what it claims if
+# it accounts for how many things were tested. Here that count is the number
+# of configurations the user has viewed, and the adjustment is Bonferroni.
+#
+#   adjusted p <  PASS_BELOW               -> PASS
+#   PASS_BELOW <= adjusted p <= FAIL_ABOVE -> INCONCLUSIVE
+#   adjusted p >  FAIL_ABOVE               -> FAIL
+PASS_BELOW = 0.05
+FAIL_ABOVE = 0.20
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_RESULTS_DIR = _REPO_ROOT / "outputs" / "permutations"
 
 
 # --------------------------------------------------------------------------
@@ -53,9 +92,8 @@ class PeriodInfo:
 
 @dataclass(frozen=True)
 class CostPoint:
-    multiplier: float
-    sharpe: float
-    total_return: float
+    multiplier: float  # 1.0, 2.0, 3.0 x the base cost assumptions
+    sharpe: float | None  # None if the backtest's Sharpe was undefined
 
 
 @dataclass(frozen=True)
@@ -66,21 +104,28 @@ class AnalysisResult:
     period_label: str
     start_date: str
     end_date: str
-    # headline performance
-    sharpe: float
+    # headline performance: the real strategy, NET of 1x trading costs
+    sharpe_1x: float | None
     total_return: float
     annualized_vol: float
     max_drawdown: float  # negative by convention
-    hit_rate: float
-    n_trades: int
-    # curves: DatetimeIndex, columns "strategy" and "benchmark", both start at 1.0
+    hit_rate: float  # fraction of days with a positive return
+    turnover: float  # annualized; 1.0 = the whole book traded once a year
+    # curve: DatetimeIndex, one column "strategy", 1.0 at the start (1x costs)
     equity_curve: pd.DataFrame
-    # significance
-    p_value: float
-    null_sharpes: list[float]
-    n_permutations: int
-    # cost sensitivity
+    # significance: GROSS (no costs) real Sharpe vs GROSS shuffled Sharpes
+    sharpe_gross: float | None
+    null_sharpes_gross: list[float]  # raw and unbinned; NaN draws removed
+    n_permutations: int  # shuffles run (including any dropped as NaN)
+    n_dropped: int  # shuffles whose Sharpe was NaN and so were excluded
+    p_value: float  # raw, one-sided
+    adjusted_p_value: float  # bonferroni_adjust(p_value, k)
+    k: int  # number of configurations the adjustment accounts for
+    null_turnover: float  # annualized turnover of the shuffled portfolios
+    # cost sensitivity of the real strategy
     cost_stress: list[CostPoint]
+    # universe breadth: average names with a score on each year's rebalance dates
+    names_per_year: dict[str, float]
     # scope
     limitations: list[str]
 
@@ -95,212 +140,300 @@ class Verdict:
     explanation: str
 
 
+class ResultNotComputedError(KeyError):
+    """The (factor, period) is valid but its results file doesn't exist yet.
+
+    Subclasses KeyError so callers that already map KeyError to "not found"
+    keep working; catch this first to distinguish "not computed yet" from
+    "no such factor/period".
+    """
+
+    def __str__(self) -> str:  # KeyError would wrap the message in quotes
+        return str(self.args[0]) if self.args else ""
+
+
 # --------------------------------------------------------------------------
 # Menus
 # --------------------------------------------------------------------------
 
-_FACTORS: tuple[FactorInfo, ...] = (
-    FactorInfo(
-        "st_reversal",
-        "Short-Term Reversal",
-        "Buys recent losers and sells recent winners over a one-week window.",
-    ),
-    FactorInfo(
-        "amihud_illiquidity",
-        "Amihud Illiquidity",
-        "Favours stocks whose prices move a lot per dollar traded.",
-    ),
-    FactorInfo(
-        "price_to_ma",
-        "Price to Moving Average",
-        "Compares price to its own recent average.",
-    ),
-    FactorInfo(
-        "momentum",
+# Display text only. The keys and their order come from
+# PRICE_FACTOR_BUILDERS; the check below fails loudly if the two drift.
+_FACTOR_TEXT: dict[str, tuple[str, str]] = {
+    "momentum": (
         "Momentum (12-1)",
-        "Buys stocks that rose over the past year, skipping the last month.",
+        "Buys stocks that rose most over the past year, skipping the last month; "
+        "sells the biggest losers.",
     ),
-    FactorInfo(
-        "realized_vol",
-        "Realized Volatility",
-        "Ranks stocks by how much their returns have varied recently.",
-    ),
-    FactorInfo(
-        "ts_momentum",
+    "ts_momentum": (
         "Time-Series Momentum",
-        "Each stock's own trend rather than its rank against others.",
+        "Ranks stocks by the strength of their own six-month trend, scaled by "
+        "their volatility.",
     ),
-)
-
-_PERIODS: tuple[PeriodInfo, ...] = (
-    PeriodInfo("2015_2020", "2015-2020", "2015-01-01", "2019-12-31"),
-    PeriodInfo("2020_2024", "2020-2024", "2020-01-01", "2024-12-31"),
-    PeriodInfo("2015_2024", "Full sample", "2015-01-01", "2024-12-31"),
-)
-
-# Placeholder Sharpe values, roughly in the range real results fall in so the
-# layout is designed against realistic numbers. NOT real results.
-_PLACEHOLDER_SHARPE: dict[tuple[str, str], float] = {
-    ("st_reversal", "2015_2020"): 0.50,
-    ("st_reversal", "2020_2024"): 0.39,
-    ("st_reversal", "2015_2024"): 0.44,
-    ("amihud_illiquidity", "2015_2020"): 0.97,
-    ("amihud_illiquidity", "2020_2024"): 0.30,
-    ("amihud_illiquidity", "2015_2024"): 0.61,
-    ("price_to_ma", "2015_2020"): 0.73,
-    ("price_to_ma", "2020_2024"): 0.07,
-    ("price_to_ma", "2015_2024"): 0.38,
-    ("momentum", "2015_2020"): 0.06,
-    ("momentum", "2020_2024"): -0.02,
-    ("momentum", "2015_2024"): 0.01,
-    ("realized_vol", "2015_2020"): -0.21,
-    ("realized_vol", "2020_2024"): -0.60,
-    ("realized_vol", "2015_2024"): -0.39,
-    ("ts_momentum", "2015_2020"): -0.11,
-    ("ts_momentum", "2020_2024"): -0.34,
-    ("ts_momentum", "2015_2024"): -0.22,
+    "st_reversal": (
+        "Short-Term Reversal",
+        "Buys last week's biggest losers and sells last week's biggest winners.",
+    ),
+    "price_to_ma": (
+        "Price to Moving Average",
+        "Buys stocks trading far below their one-month average price; sells "
+        "those far above it.",
+    ),
+    "realized_vol": (
+        "Low Volatility",
+        "Buys the calmest stocks (lowest three-month volatility) and sells the "
+        "most volatile.",
+    ),
+    "ewma_vol": (
+        "Low Volatility (EWMA)",
+        "Like Low Volatility, but weights recent days more so it reacts faster.",
+    ),
+    "market_beta": (
+        "Low Beta",
+        "Buys stocks that move least with the market and sells those that move "
+        "most.",
+    ),
+    "pca_reversal": (
+        "Residual Reversal",
+        "Buys stocks that fell for reasons the broad market moves don't "
+        "explain, betting they bounce back.",
+    ),
+    "amihud_illiquidity": (
+        "Amihud Illiquidity",
+        "Buys stocks whose prices move most per dollar traded (least liquid) "
+        "and sells the most liquid.",
+    ),
+    "dollar_volume": (
+        "Dollar Volume",
+        "Buys the most heavily traded stocks and sells the least traded.",
+    ),
+    "roll_spread": (
+        "Roll Spread",
+        "Buys stocks with the tightest estimated bid-ask spreads and sells "
+        "those with the widest.",
+    ),
 }
-
-_LIMITATIONS: tuple[str, ...] = (
-    "PLACEHOLDER TEXT. Michael writes the real limitations in week 2.",
-    "Daily price data only; no intraday execution modelling.",
-    "149 US large-cap names; smaller and delisted companies are excluded.",
-    "Fixed commission and slippage assumptions rather than live quotes.",
-    "Results are precomputed for a fixed menu of configurations.",
-    "Research output. Not investment advice.",
-)
-
-_N_PERMUTATIONS = 1000
-
-_FACTORS_BY_KEY = {f.key: f for f in _FACTORS}
-_PERIODS_BY_KEY = {p.key: p for p in _PERIODS}
+if list(_FACTOR_TEXT) != list(PRICE_FACTOR_BUILDERS):
+    raise RuntimeError(
+        "app/api.py factor text is out of sync with PRICE_FACTOR_BUILDERS: "
+        f"{sorted(set(_FACTOR_TEXT) ^ set(PRICE_FACTOR_BUILDERS))}"
+    )
 
 
-# --------------------------------------------------------------------------
-# Public functions
-# --------------------------------------------------------------------------
+def _load_runner() -> ModuleType:
+    """Load scripts/run_permutations.py (not a package) to read its PERIODS.
+
+    Importing it has no side effects: the script only runs under
+    ``if __name__ == "__main__"``.
+    """
+    path = _REPO_ROOT / "scripts" / "run_permutations.py"
+    spec = importlib.util.spec_from_file_location("_qfrp_run_permutations", path)
+    if spec is None or spec.loader is None:  # pragma: no cover - broken checkout
+        raise ImportError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_PERIOD_DATES: dict[str, tuple[str, str]] = dict(_load_runner().PERIODS)
+
+
+def _period_info(key: str) -> PeriodInfo:
+    start, end = _PERIOD_DATES[key]
+    return PeriodInfo(key, f"{start[:4]}-{end[:4]}", start, end)
 
 
 def list_factors() -> list[FactorInfo]:
-    """The factor menu, in display order."""
-    return list(_FACTORS)
+    """The factor menu (the 11 price factors), in display order."""
+    return [FactorInfo(key, *_FACTOR_TEXT[key]) for key in PRICE_FACTOR_BUILDERS]
 
 
 def list_periods() -> list[PeriodInfo]:
-    """The date-range menu, in display order."""
-    return list(_PERIODS)
+    """The date-range menu (the 5 periods), in display order."""
+    return [_period_info(key) for key in _PERIOD_DATES]
 
 
-def get_analysis(factor_key: str, period_key: str) -> AnalysisResult:
-    """Fabricated analysis for one (factor, period) pair.
+# --------------------------------------------------------------------------
+# Analysis
+# --------------------------------------------------------------------------
 
-    Deterministic: the same keys always give the same numbers, so the UI does
-    not flicker between reruns.
-    """
-    if factor_key not in _FACTORS_BY_KEY:
-        raise KeyError(f"unknown factor_key: {factor_key!r}")
-    if period_key not in _PERIODS_BY_KEY:
-        raise KeyError(f"unknown period_key: {period_key!r}")
 
-    factor = _FACTORS_BY_KEY[factor_key]
-    period = _PERIODS_BY_KEY[period_key]
+def _results_dir() -> Path:
+    override = os.environ.get("QFRP_RESULTS_DIR")
+    return Path(override) if override else _DEFAULT_RESULTS_DIR
 
-    # Seed off the keys so results are stable across reruns.
-    rng = np.random.default_rng(abs(hash((factor_key, period_key))) % (2**32))
 
-    sharpe = _PLACEHOLDER_SHARPE[(factor_key, period_key)]
+def _check_k(k: Any, name: str) -> int:
+    # bool is a subclass of int; True would silently mean k=1.
+    if isinstance(k, bool) or not isinstance(k, int):
+        raise TypeError(f"{name} must be an integer >= 1, got {k!r}")
+    if k < 1:
+        raise ValueError(f"{name} must be >= 1, got {k}")
+    return k
 
-    dates = pd.bdate_range(period.start_date, period.end_date)
-    n = len(dates)
 
-    ann_vol = 0.10 + 0.04 * rng.random()
-    daily_vol = ann_vol / np.sqrt(252.0)
-    daily_mean = sharpe * daily_vol
-
-    strat_returns = rng.normal(daily_mean, daily_vol, n)
-    strat_curve = np.cumprod(1.0 + strat_returns)
-
-    bench_returns = rng.normal(0.09 / 252.0, 0.18 / np.sqrt(252.0), n)
-    bench_curve = np.cumprod(1.0 + bench_returns)
-
-    equity_curve = pd.DataFrame(
-        {"strategy": strat_curve, "benchmark": bench_curve}, index=dates
-    )
-
-    running_peak = np.maximum.accumulate(strat_curve)
-    max_drawdown = float((strat_curve / running_peak - 1.0).min())
-
-    null_sharpes = rng.normal(0.0, 0.32, _N_PERMUTATIONS)
-    p_value = float((null_sharpes >= sharpe).mean())
-
-    total_return = float(strat_curve[-1] - 1.0)
-    cost_stress = [
-        CostPoint(
-            multiplier=m,
-            sharpe=round(sharpe - 0.18 * (m - 1.0), 3),
-            total_return=round(total_return - 0.09 * (m - 1.0), 4),
+def _validate_keys(factor_key: str, period_key: str) -> None:
+    if factor_key not in PRICE_FACTOR_BUILDERS:
+        raise KeyError(
+            f"unknown factor_key {factor_key!r}; valid: {list(PRICE_FACTOR_BUILDERS)}"
         )
-        for m in (1.0, 2.0, 3.0)
+    if period_key not in _PERIOD_DATES:
+        raise KeyError(f"unknown period_key {period_key!r}; valid: {list(_PERIOD_DATES)}")
+
+
+def _load_record(factor_key: str, period_key: str) -> dict[str, Any]:
+    path = _results_dir() / f"{factor_key}_{period_key}.json"
+    if not path.is_file():
+        raise ResultNotComputedError(
+            f"results for {factor_key} / {period_key} are not computed yet "
+            f"(expected {path}); run scripts/run_permutations.py"
+        )
+    record: dict[str, Any] = json.loads(path.read_text())
+    if (record.get("factor"), record.get("period")) != (factor_key, period_key):
+        raise ValueError(
+            f"{path.name} contains {record.get('factor')}/{record.get('period')}, "
+            f"not {factor_key}/{period_key}"
+        )
+    return record
+
+
+def _limitations(record: dict[str, Any]) -> list[str]:
+    s = record["settings"]
+    names = list(record["names_per_year"].values())
+    n = record["n_shuffles"]
+    lo, hi = min(names), max(names)
+    breadth = (
+        f"{lo:.0f} stocks had a score throughout this period."
+        if round(lo) == round(hi)
+        else f"Stocks join only once they started trading: between {lo:.0f} and "
+        f"{hi:.0f} stocks had a score in this period."
+    )
+    return [
+        f"Universe: {s['n_tickers']} US large-cap stocks picked from today's (2026) "
+        "market. Companies that were delisted, acquired or went bankrupt earlier "
+        "(e.g. Lehman Brothers in 2008) are missing, so these historical results "
+        "are biased by hindsight (survivorship bias).",
+        breadth,
+        f"The p-value compares the strategy's Sharpe ratio BEFORE trading costs with "
+        f"{n:,} random reshufflings of the factor's stock rankings, also before costs. "
+        f"Reshuffled portfolios trade far more ({record['null_turnover_annualized_mean']:.1f}x "
+        f"a year vs {record['turnover_annualized_gross']:.1f}x), so comparing after "
+        "costs would unfairly handicap them. Whether any edge survives costs is shown "
+        "separately in the cost stress test.",
+        f"Trading costs are modelled, not measured: a {s['spread_bps_1x']:g} bp "
+        f"bid-ask spread, ${s['commission_rate_1x']:g} per share commission "
+        f"(${s['commission_minimum_1x']:g} minimum), square-root market impact, at most "
+        f"{s['max_participation']:.0%} of a day's volume, filled at the next day's open.",
+        "Prices are Yahoo Finance daily bars adjusted for splits and dividends; Yahoo "
+        "occasionally mis-adjusts (e.g. around Danaher's 2016 spin-off).",
+        "The reshuffle test treats each month's ranking as independent; it does not "
+        "model how slowly a factor's rankings change over time.",
+        f"The adjusted p-value multiplies the raw p-value by the number of "
+        f"configurations viewed (Bonferroni), which is deliberately cautious. With "
+        f"{n:,} reshuffles the smallest possible raw p-value is 1/{n + 1:,}.",
+        "Research output for learning purposes. Not investment advice.",
     ]
 
+
+def _finite(x: Any) -> float | None:
+    return float(x) if x is not None and math.isfinite(float(x)) else None
+
+
+def get_analysis(factor_key: str, period_key: str, k: int = 1) -> AnalysisResult:
+    """Precomputed analysis for one (factor, period) configuration.
+
+    ``k`` is the number of configurations to adjust the p-value for (the
+    number the user has viewed); ``adjusted_p_value`` is
+    ``bonferroni_adjust(p_value, k)``.
+
+    Raises KeyError for an unknown factor or period, ResultNotComputedError
+    (a KeyError) if the results file doesn't exist yet, TypeError/ValueError
+    if ``k`` is not an integer >= 1.
+    """
+    _validate_keys(factor_key, period_key)
+    k = _check_k(k, "k")
+    record = _load_record(factor_key, period_key)
+    period = _period_info(period_key)
+
+    curve = record["equity_curve_1x"]
+    equity = pd.Series(curve["values"], index=pd.DatetimeIndex(curve["dates"]), dtype=float)
+    # The engine's first-day return is 0 (equity starts at initial capital),
+    # so fillna(0) reproduces the backtest's own annualized_vol exactly.
+    returns = equity.pct_change().fillna(0.0)
+
+    nulls = [float(x) for x in record["null_sharpes_gross"] if x is not None]
+    p_value = float(record["p_value"])
+
     return AnalysisResult(
-        factor_key=factor.key,
-        factor_label=factor.label,
+        factor_key=factor_key,
+        factor_label=_FACTOR_TEXT[factor_key][0],
         period_label=period.label,
         start_date=period.start_date,
         end_date=period.end_date,
-        sharpe=round(sharpe, 3),
-        total_return=round(total_return, 4),
-        annualized_vol=round(float(ann_vol), 4),
-        max_drawdown=round(max_drawdown, 4),
-        hit_rate=round(float((strat_returns > 0).mean()), 4),
-        n_trades=int(rng.integers(40, 400)),
-        equity_curve=equity_curve,
-        p_value=round(p_value, 4),
-        null_sharpes=[float(x) for x in null_sharpes],
-        n_permutations=_N_PERMUTATIONS,
-        cost_stress=cost_stress,
-        limitations=list(_LIMITATIONS),
+        sharpe_1x=_finite(record["sharpe_1x"]),
+        total_return=float(record["total_return_1x"]),
+        annualized_vol=annualized_vol(returns),
+        max_drawdown=float(record["max_drawdown_1x"]),
+        hit_rate=float(record["hit_rate_1x"]),
+        turnover=float(record["turnover_annualized_1x"]),
+        equity_curve=(equity / equity.iloc[0]).to_frame("strategy"),
+        sharpe_gross=_finite(record["sharpe_gross"]),
+        null_sharpes_gross=nulls,
+        n_permutations=int(record["n_shuffles"]),
+        n_dropped=int(record["n_dropped"]),
+        p_value=p_value,
+        adjusted_p_value=bonferroni_adjust(p_value, k),
+        k=k,
+        null_turnover=float(record["null_turnover_annualized_mean"]),
+        cost_stress=[
+            CostPoint(multiplier=m, sharpe=_finite(record[f"sharpe_{m:g}x"]))
+            for m in (1.0, 2.0, 3.0)
+        ],
+        names_per_year={str(y): float(v) for y, v in record["names_per_year"].items()},
+        limitations=_limitations(record),
     )
+
+
+# --------------------------------------------------------------------------
+# Verdict
+# --------------------------------------------------------------------------
 
 
 def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
-    """Apply a multiple-testing penalty and render a verdict.
+    """Adjust ``result.p_value`` for ``n_configs_viewed`` tests and band it.
 
-    Placeholder rule (Sidak-style adjustment). The real thresholds and method
-    are Michael's decision in week 2; only the returned shape is fixed.
+    The verdict is about the SIGNAL (gross of costs): does the factor's
+    ranking of stocks beat random rankings? Whether it makes money after
+    costs is a separate question, noted in the explanation when it doesn't.
     """
-    n = max(1, int(n_configs_viewed))
+    n = _check_k(n_configs_viewed, "n_configs_viewed")
     raw_p = float(result.p_value)
-    adjusted_p = float(1.0 - (1.0 - raw_p) ** n)
+    adjusted_p = bonferroni_adjust(raw_p, n)
 
-    survives_2x = any(
-        c.multiplier == 2.0 and c.sharpe > 0.0 for c in result.cost_stress
-    )
-
-    if adjusted_p > 0.10:
-        label = "FAIL"
-        headline = "Indistinguishable from luck"
-    elif adjusted_p < 0.05 and survives_2x:
-        label = "PASS"
-        headline = "Edge survives testing"
+    if adjusted_p < PASS_BELOW:
+        label, headline = "PASS", "Signal beats random rankings"
+    elif adjusted_p <= FAIL_ABOVE:
+        label, headline = "INCONCLUSIVE", "Not enough evidence either way"
     else:
-        label = "INCONCLUSIVE"
-        headline = "Not enough evidence either way"
+        label, headline = "FAIL", "Indistinguishable from luck"
 
     explanation = (
-        f"Across {_N_PERMUTATIONS} random reshuffles, {raw_p:.0%} did as well "
-        f"or better. You have looked at {n} configuration"
-        f"{'s' if n != 1 else ''} this session, which raises the chance that "
-        f"one looks good by accident; adjusted for that, the figure is "
-        f"{adjusted_p:.0%}."
+        f"Before trading costs, about {raw_p:.1%} of {result.n_permutations:,} random "
+        f"reshufflings of this factor's rankings did as well or better (raw p = "
+        f"{raw_p:.4f}). You have viewed {n} configuration{'s' if n != 1 else ''}, "
+        f"which raises the chance one looks good by accident; adjusted for that "
+        f"(p x {n}, capped at 1), p = {adjusted_p:.4f}."
     )
+    if result.sharpe_1x is None or result.sharpe_1x <= 0:
+        explanation += (
+            " Note: after modelled trading costs the strategy's Sharpe ratio was "
+            "zero or negative."
+        )
 
     return Verdict(
         label=label,
         headline=headline,
-        raw_p_value=round(raw_p, 4),
-        adjusted_p_value=round(adjusted_p, 4),
+        raw_p_value=raw_p,
+        adjusted_p_value=adjusted_p,
         n_configs_viewed=n,
         explanation=explanation,
     )
