@@ -22,7 +22,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from quantlab.backtest.costs import PerShareCommission, VolumeImpactSlippage
+from quantlab.backtest.costs import (
+    PerShareCommission,
+    VolumeImpactSlippage,
+    ZeroCommission,
+    ZeroSlippage,
+)
 from quantlab.backtest.engine import BacktestEngine
 from quantlab.backtest.execution import ExecutionSimulator
 from quantlab.backtest.results import BacktestResult
@@ -115,13 +120,28 @@ def normalization() -> SignalPipeline:
     return SignalPipeline([Winsorize(0.01, 0.99), ZScore()])
 
 
-def make_execution(cost_multiplier: float = 1.0) -> ExecutionSimulator:
+def make_execution(
+    cost_multiplier: float = 1.0, *, frictionless: bool = False
+) -> ExecutionSimulator:
     """Execution simulator at ``cost_multiplier`` times the 1x cost setting.
 
     Scales the spread and the commission (per-share rate and per-order
     minimum). The market-impact coefficient and participation cap are left
-    unchanged: impact is a model of the stock's liquidity, not a fee.
+    unchanged: impact is a model of the stock's liquidity, not a fee. So
+    ``cost_multiplier=0`` still charges impact.
+
+    ``frictionless=True`` removes every cost -- spread, commission AND
+    impact -- for gross (pre-cost) returns. The participation cap is kept:
+    it limits what can be traded, it doesn't charge for trading.
     """
+    if frictionless:
+        if cost_multiplier != 1.0:
+            raise BacktestError("pass either frictionless=True or a cost_multiplier, not both")
+        return ExecutionSimulator(
+            slippage=ZeroSlippage(),
+            commission=ZeroCommission(),
+            max_participation=MAX_PARTICIPATION,
+        )
     if cost_multiplier < 0:
         raise BacktestError("cost_multiplier must be >= 0")
     return ExecutionSimulator(
@@ -141,8 +161,13 @@ def run_ls_backtest(
     ds: MarketDataset,
     *,
     cost_multiplier: float = 1.0,
+    frictionless: bool = False,
 ) -> BacktestResult:
-    """Costed long/short backtest of ``signal_frame`` on ``ds``."""
+    """Long/short backtest of ``signal_frame`` on ``ds``.
+
+    Costed at ``cost_multiplier`` x the 1x setting, or cost-free with
+    ``frictionless=True`` (see :func:`make_execution`).
+    """
     weights = signal_to_weights(
         signal_frame,
         long_frac=LONG_FRAC,
@@ -152,5 +177,8 @@ def run_ls_backtest(
     )
     strategy = TargetWeightStrategy(weights=weights, tolerance=TOLERANCE)
     return BacktestEngine(
-        ds, strategy, make_execution(cost_multiplier), initial_capital=INITIAL_CAPITAL
+        ds,
+        strategy,
+        make_execution(cost_multiplier, frictionless=frictionless),
+        initial_capital=INITIAL_CAPITAL,
     ).run()

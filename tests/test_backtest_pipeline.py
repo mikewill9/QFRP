@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from quantlab.backtest import PerShareCommission, VolumeImpactSlippage
+from quantlab.backtest import (
+    PerShareCommission,
+    VolumeImpactSlippage,
+    ZeroCommission,
+    ZeroSlippage,
+)
 from quantlab.backtest.pipeline import (
     COMMISSION_MINIMUM,
     COMMISSION_RATE,
@@ -59,3 +64,21 @@ def test_higher_costs_cost_more(synth):
     assert base.n_trades > 0
     assert doubled.costs_paid.sum() > base.costs_paid.sum()
     assert doubled.final_equity < base.final_equity
+
+
+def test_frictionless_execution_charges_nothing(synth):
+    ex = make_execution(frictionless=True)
+    assert isinstance(ex.slippage, ZeroSlippage)
+    assert isinstance(ex.commission, ZeroCommission)
+    assert ex.max_participation == MAX_PARTICIPATION
+    signal = normalization().transform(PRICE_FACTOR_BUILDERS["st_reversal"]().compute(synth))
+    gross = run_ls_backtest(signal, synth, frictionless=True)
+    net = run_ls_backtest(signal, synth)
+    assert gross.n_trades > 0
+    assert gross.costs_paid.sum() == 0.0
+    assert gross.final_equity > net.final_equity
+
+
+def test_frictionless_rejects_cost_multiplier():
+    with pytest.raises(BacktestError, match="not both"):
+        make_execution(2.0, frictionless=True)
