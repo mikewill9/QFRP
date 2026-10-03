@@ -1,5 +1,6 @@
 1. What the test says 
 
+Amihud ranks stocks by illiquidity. It passed with p between 0.0005 and 0.005 at k=1 in periods 2005_2009, 2005_2024, 2010_2014, 2015_2019 and it failed in 2020 to 2024 (Sharpe 0.22, p = 0.29). The 2005_2009, 2010_2014 and 2015_2019 results were rerun at 20,000 shuffles with the same verdicts. 
 Amihud ranks stocks by illiquidity. It passed with p between 0.0005 and 0.005 at k=1 in periods 2005_2009, 2005_2024, 2010_2014, 2015_2019 and it failed in 2020 to 2024 (Sharpe 0.22, p = 0.29).
 
 2. What the test can and can't answer
