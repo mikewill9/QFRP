@@ -17,6 +17,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - app/api.py, including reversed-verdict logic and roll_spread exclusion
 - CONTRACT.md
 - Shipping precomputed results
+- High-precision rerun tooling: --config flag in run_permutations.py, compare_permutations.py, tests/test_run_permutations_cli.py
 
 
 ## Drafted with Claude (chat), edited and approved by Michael
