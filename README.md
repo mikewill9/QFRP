@@ -198,6 +198,19 @@ masks over a 150-name seed list, survivorship caveats documented).
 All subsystems in `docs/architecture.md` are implemented; see
 `docs/research_roadmap.md` for the staged research plan from here.
 
+## Quick start
+
+Tested on Python 3.14 on macOS.
+
+```
+git clone https://github.com/mikewill9/QFRP.git
+cd QFRP
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python -m pytest -q
+```
+
 ## Permutation test results
 
 Each factor/period config is tested with 2,000 within-date shuffles. 14 borderline configs were rerun at 20,000 shuffles with a fresh seed, and no verdict changed at k=1. See `docs/rerun_20k_comparison.md`.
@@ -206,3 +219,16 @@ Each factor/period config is tested with 2,000 within-date shuffles. 14 borderli
 
 quantlab is a research framework. Nothing in this repository is investment
 advice, and simulated results do not represent live trading.
+
+## Quick start
+
+Tested on Python 3.14 on macOS.
+
+```
+git clone https://github.com/mikewill9/QFRP.git
+cd QFRP
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python -m pytest -q
+```
