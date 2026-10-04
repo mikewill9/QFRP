@@ -1,8 +1,8 @@
-# QuantResearchAI Project Handoff
+# QFRP Project Handoff
 
 ## Project Overview
 
-QuantResearchAI is a Python quantitative finance research framework.
+QFRP is a Python quantitative finance research framework.
 
 The goal is to build a serious research environment for exploring quantitative investing ideas.
 
@@ -52,6 +52,13 @@ Between checkpoints 9 and 10 a research-experiments commit (b067be5)
 ran factor testing on US_LARGE_CAP_149 (real Yahoo data) in
 notebooks/momentum_research.ipynb.
 
+Work since Checkpoint 11 (commits de38eb1..bcfd643, 2026-09-13 to
+2026-10-04) was NOT committed as one checkpoint. It is a run of small
+commits: the permutation significance test, the web app's data layer,
+the shipped results, and the disclosure documents. The first two of
+those commits are labelled "CP12" in git. It is all described below
+under "Post-Checkpoint 11: Permutation Testing and the QFRP App".
+
 The repository is the source of truth.
 
 Do not rely on previous chat history.
@@ -60,12 +67,27 @@ Do not rely on previous chat history.
 
 - Python 3.14 virtual environment at `.venv` (not committed)
 - Install with: `pip install -e ".[dev]"`
-- Validate with: `python -m pytest` (484 tests), `ruff check src tests examples`, `mypy`
-- Everything runs offline on the synthetic market; no downloads needed
+- Validate with: `python -m pytest` (561 tests), `ruff check src tests examples`, `mypy`
+  (`ruff check app scripts` is also clean; mypy covers 70 source files)
+- The test suite, the examples and the app's data layer all run offline;
+  no downloads needed. Tests use the synthetic market, and `app/api.py`
+  only reads the JSON files committed in `results/permutations/`.
+- `pyproject.toml` sets pytest `pythonpath = ["."]` so tests can
+  `import app.api` (`app/` is not an installed package).
 - Test suite runs matplotlib headless (Agg backend, wired in tests/conftest.py)
-- Real-data caches (`~/.quantlab/cache`) are machine-local and not in git.
+- Real-data caches (`~/.quantlab/cache*`) are machine-local and not in git.
   The 2015-2024 price cache for US_LARGE_CAP_149 lives on the primary
   (Windows) machine; a fresh clone re-downloads on first notebook run.
+- The permutation runner is the one thing that needs real prices. It
+  reads a separate cache fetched fresh over 2004-01-01..2024-12-31
+  (`~/.quantlab/cache_2004_2024` on the Mac, selected with the
+  `QUANTLAB_CACHE_DIR` environment variable) and refuses to run if that
+  cache is incomplete. Regenerating results on another machine means
+  building that cache first; the numbers may then differ slightly,
+  because Yahoo re-adjusts historical prices over time.
+- Machine-local and gitignored: `outputs/permutations/` (the runner's
+  raw output, all 55 configs) and `results/permutations_hp/` (the
+  20,000-shuffle rerun). Only `results/permutations/` is tracked.
 
 
 # Completed Work
@@ -457,18 +479,362 @@ configuration whose Ridge baseline is already understood, and count
 every walk-forward. Small OOS gains over Ridge are within noise.
 
 
+## Post-Checkpoint 11: Permutation Testing and the QFRP App
+
+Completed: a statistical test that asks "could this backtest result be
+luck?", run for every price factor and date range, with the results
+shipped in the repo and served to a web app through a small, fixed
+interface.
+
+The question the whole block answers: a backtest can look good by
+chance. A permutation test measures how often. Keep the strategy
+exactly the same, but randomly reassign the factor's scores among the
+stocks, and re-run the backtest thousands of times. If the real result
+is no better than those random versions, the factor's ranking carried
+no information.
+
+### Significance functions (src/quantlab/analytics/significance.py)
+
+Hand-written by Michael, with their tests (tests/test_significance.py).
+See "AI usage" below before editing them.
+
+- `permute_within_date(zscores, rng)`: shuffles one date's scores
+  across stocks. NaN entries stay where they are, so a stock with no
+  score on that date still has no score.
+- `permutation_pvalue(real_sharpe, null_sharpes) -> (p, n_dropped)`:
+  one-sided p-value, the share of shuffled Sharpes at least as large as
+  the real one, computed as (count + 1) / (n + 1) so it is never
+  exactly zero. NaN shuffles are dropped and counted; a NaN real Sharpe
+  or an all-NaN null raises.
+- `bonferroni_adjust(p, k)`: `min(1.0, p * k)`. The multiple-testing
+  correction: looking at k results makes a lucky one k times more
+  likely, so the p-value is multiplied by k. Simple and deliberately
+  strict.
+
+### Shared backtest convention (src/quantlab/backtest/pipeline.py)
+
+Extracted from notebooks/factor_research.ipynb so the notebook and the
+scripts run the same code instead of drifting copies (the notebook now
+imports from it). Documented in docs/architecture.md section 4.3.
+
+- `TICKERS`: 148 names, `US_LARGE_CAP_150` minus MMC (Yahoo data issue)
+  and EA (delisted; Yahoo no longer serves its history). Survivors only.
+- `DATA_START = "2004-01-01"`: prices are always loaded from here so
+  every factor is warmed up by 2005. Factors are computed on the full
+  history and then trimmed to the window, so a given date gets the same
+  score in every period.
+- `PRICE_FACTOR_BUILDERS`: the 11 price factors (momentum, ts_momentum,
+  st_reversal, price_to_ma, realized_vol, ewma_vol, market_beta,
+  pca_reversal, amihud_illiquidity, dollar_volume, roll_spread).
+- `normalization()`: per-date winsorize (1%/99%) then z-score.
+- Portfolio: long the top 20%, short the bottom 20%, equal weight per
+  side, gross exposure 1.0, rebalanced every 21 bars, decisions at the
+  close and fills at the next open.
+- Costs at "1x": 5 bp spread, $0.005/share commission ($1 minimum),
+  square-root market impact (coefficient 0.1), at most 5% of a bar's
+  volume.
+- `make_execution(cost_multiplier, frictionless=False)` and
+  `run_ls_backtest(signal, ds, cost_multiplier=1.0, frictionless=False)`.
+  The multiplier scales spread and commission but NOT market impact
+  (impact models the stock's liquidity, it is not a fee).
+  `frictionless=True` removes every cost and keeps the participation cap.
+
+### Permutation runner (scripts/run_permutations.py)
+
+For each (factor, period) configuration it runs the real backtest with
+no costs (gross) and at 1x/2x/3x costs, then N shuffled backtests with
+no costs, and writes one JSON.
+
+- Periods (`PERIODS`): 2005_2024 (full sample), 2005_2009, 2010_2014,
+  2015_2019, 2020_2024. The full sample overlaps the other four, so the
+  five are not independent tests.
+- 11 factors x 5 periods = 55 configurations.
+- The shuffle is applied only on rebalance dates, and those dates are
+  read off `signal_to_weights`' own output rather than re-coded, so the
+  shuffle hits exactly the rows the portfolio trades on.
+- **Significance is tested gross, on both sides.** Shuffled portfolios
+  trade about twice as much as the real one, so charging costs would
+  push the random versions below zero and make any real factor look
+  more significant than it is. Michael caught this bias in the first
+  version. Whether an edge survives costs is a separate question,
+  answered by the 1x/2x/3x cost stress on the real strategy.
+- Seeds: each config gets its own `SeedSequence` from (base seed,
+  SHA-256 of "factor|period"). Configs never share random draws and the
+  same command reproduces the same nulls on any machine. Python's
+  built-in `hash()` is not used because it changes per process.
+- Safe to interrupt: finished configs are skipped on restart, files are
+  written atomically, and an existing JSON made with a different N or
+  base seed stops the run instead of being silently reused.
+- Never downloads: `check_cache_complete()` exits if any ticker's cache
+  is short of the data window. Stitching fresh Yahoo prices onto an old
+  cache creates fake jumps, because the dividend adjustment basis differs.
+- Flags: `--n` (default 1000), `--factor`, `--period`, `--base-seed`
+  (default 20260927), `--out-dir` (default `outputs/permutations/`),
+  `--workers` (default: all cores but 2), and `--config`.
+- **`--config FACTOR:PERIOD`** (repeatable): run only the listed
+  configurations. Added so a few borderline results could be rerun at a
+  higher N into a separate directory. It cannot be combined with
+  `--factor`/`--period`, rejects unknown names, and drops repeats while
+  keeping order (tests/test_run_permutations_cli.py).
+
+```
+QUANTLAB_CACHE_DIR=~/.quantlab/cache_2004_2024 \
+    python scripts/run_permutations.py --n 2000
+```
+
+Each JSON stores: the raw p-value, the gross Sharpe, every shuffled
+gross Sharpe (unbinned), Sharpe at 1x/2x/3x, total return, max drawdown,
+hit rate and turnover at 1x, the shuffles' average turnover, the 1x
+equity curve, names with a score per year, every setting used, and
+provenance (git commit, cache directory, timestamp, runtime).
+
+### Shipped results (results/permutations/)
+
+- 50 JSON files, `{factor}_{period}.json`, about 6.3 MB, tracked in git.
+  They are unchanged copies of the runner's output for the 10 factors
+  the app offers (the 5 `roll_spread` files are left out).
+- Every file: N = 2,000 shuffles, base seed 20260927, 148 tickers, and
+  zero shuffles dropped as NaN.
+- Provenance: 45 files were generated at commit fa74751 and 5 (the
+  2020_2024 files for momentum, ts_momentum, st_reversal, price_to_ma,
+  realized_vol) at cd2de31. The commits between those two changed only
+  documents, app/api.py and its tests, not any backtest code.
+- `.gitignore` ignores `results/*` except `results/permutations/`.
+- `tests/test_api.py::test_shipped_results_cover_every_menu_config`
+  fails if a menu configuration has no shipped file.
+
+Verdicts for a single test (k=1), computed from the shipped files
+through app/api.py on 2026-10-04:
+
+- 5 PASS: amihud_illiquidity in 2005_2024, 2005_2009, 2010_2014 and
+  2015_2019, and price_to_ma in 2015_2019.
+- 5 INCONCLUSIVE: st_reversal 2015_2019 and 2020_2024, price_to_ma
+  2005_2024 and 2020_2024, pca_reversal 2005_2009.
+- 40 FAIL, of which 9 are "reversed" (significantly WORSE than random):
+  realized_vol (2005_2024, 2005_2009, 2015_2019), ewma_vol (2005_2024,
+  2005_2009), market_beta (2005_2024) and dollar_volume (2005_2024,
+  2005_2009, 2010_2014).
+- Momentum fails in all five periods.
+- If a user has viewed all 50 (k=50), only two results still PASS:
+  amihud_illiquidity 2005_2024 and 2005_2009.
+
+**The main finding is the Amihud result, and it is a caution, not a
+discovery.** The illiquidity factor passes strongly in every period
+except the most recent (gross Sharpe 1.63 in 2005-2009 falling to 0.22
+in 2020-2024). The stock list was chosen in 2026, so a stock that was
+illiquid in 2005 and is on the list had to survive and grow large. The
+shuffle test checks for luck; it cannot check whether the universe was
+fair. docs/amihud_survivorship.md explains this, and its takeaway line
+is "Passing the test means the signal beat luck, not that the data was
+fair."
+
+### 20,000-shuffle rerun (docs/rerun_20k_comparison.md)
+
+Purpose: a p-value estimated from 2,000 shuffles has its own sampling
+error, so a result sitting near a cutoff could land on the other side
+with different random draws. The borderline results were rerun with ten
+times the shuffles and an independent seed to check.
+
+- 14 configurations at N = 20,000, base seed 20261002, at commit
+  bb11683, written to `results/permutations_hp/` (gitignored).
+- scripts/compare_permutations.py builds the comparison table. It gets
+  its verdicts from `app.api` (switching directories with
+  `QFRP_RESULTS_DIR`), so cutoffs and the reversed rule are never
+  re-implemented. It also checks the real gross Sharpe is identical in
+  both files; if not, the backtest code changed and the runs are not
+  comparable. `SELECTED_FOR` in that script records why each config was
+  picked, decided from the N=2,000 results before any rerun.
+- Result: **no verdict changed at k=1.** One changed at k=2 only:
+  price_to_ma 2020_2024 goes from FAIL to INCONCLUSIVE (adjusted p
+  0.2059 vs 0.1972, either side of the 0.20 cutoff).
+- The largest gaps between the two estimates were z = -2.5 (st_reversal
+  2015_2019) and z = -2.0 (ewma_vol 2010_2014), where z is the gap in
+  combined Monte Carlo standard errors.
+- docs/rerun_20k_comparison.md is the committed evidence. The 20k JSONs
+  themselves are not in git and exist only on the Mac.
+- **The app still serves the 2,000-shuffle files.** The rerun confirms
+  them; it does not replace them.
+- Not rerun: market_beta 2005_2024 (about 11 hours; noted in
+  LIMITATIONS.md) and amihud_illiquidity 2005_2024 (listed in
+  `SELECTED_FOR` but no rerun file exists).
+- Cost of a rerun: a 5-year config at 20,000 shuffles took about 3 hours.
+
+### App data layer (app/api.py)
+
+The only code the web app calls. It reads the precomputed JSONs and
+never runs a backtest, so every call is instant. Nothing in it is made up.
+
+- `list_factors()`: the 10-factor menu, taken from
+  `PRICE_FACTOR_BUILDERS` minus `EXCLUDED_FACTORS`.
+- `list_periods()`: the 5 periods, read from `PERIODS` in the runner
+  script (loaded with importlib because `scripts/` is not a package).
+- `get_analysis(factor_key, period_key, k=1) -> AnalysisResult`: net
+  performance at 1x costs, the equity curve, the gross significance
+  numbers, cost stress, breadth per year, and limitation strings to
+  display verbatim.
+- `verdict_for(result, n_configs_viewed) -> Verdict`: PASS when the
+  Bonferroni-adjusted p is below 0.05, FAIL above 0.20, INCONCLUSIVE in
+  between (`PASS_BELOW`, `FAIL_ABOVE`).
+
+Design decisions worth knowing:
+
+- **The verdict is computed at display time, not stored**, because the
+  adjustment depends on how many configurations the user has viewed
+  this session.
+- **Reversed FAIL.** The test is one-sided, so a strategy far worse
+  than random would also read as a plain FAIL ("no signal"). Every
+  verdict therefore runs the test in the other direction too. If that
+  passes, the label stays FAIL but `reversed` is True and the headline
+  is "Consistently worse than random".
+- **`roll_spread` is hidden** (`EXCLUDED_FACTORS`). Its estimator
+  clamps at zero, so about 54 of 148 stocks tie for the best score and
+  the sort's tie-breaking, not the factor, picks the long leg. That
+  biases the null distribution and makes its p-values meaningless. It
+  stays in the catalog and the runner still computes it.
+- **`SURVIVORSHIP_NOTE`** is appended to every PASS explanation.
+- Two Sharpes, two questions: `sharpe_gross` is what the p-value tests;
+  `sharpe_1x` is whether it was worth trading.
+- An import-time check raises if the menu text drifts out of sync with
+  the factor catalog.
+- Errors: unknown or excluded key raises `KeyError`; a valid key with
+  no file raises `ResultNotComputedError` (a `KeyError` subclass); bad
+  `k` raises `ValueError` or `TypeError`.
+- `QFRP_RESULTS_DIR` overrides the results directory (used by the tests
+  and by compare_permutations.py).
+
+### Documents added
+
+- **CONTRACT.md** (v2): the boundary between the two team members.
+  Michael owns everything behind `app/api.py` (`src/quantlab/`,
+  `scripts/`, `results/`); BP owns the frontend in `app/ui/`. BP calls
+  the four functions and reads named fields, and never imports
+  `quantlab` directly. Changes to CONTRACT.md need both to agree. It
+  defines every field, the verdict bands, error-to-HTTP mapping and
+  deployment needs. Known stale line: section 5 still says
+  `SURVIVORSHIP_NOTE` is "empty for now"; it has since been written.
+- **LIMITATIONS.md**: the honest list. Data (survivorship bias, the
+  universe growing from 126 to 148 names, price factors only, known
+  Yahoo errors such as DHR on 2016-07-05), method (gross significance,
+  the shuffle design, Bonferroni being stricter than needed because
+  periods overlap, minimum p of about 0.0005, not every borderline
+  config rerun) and app (the viewed-count resets on page refresh; no
+  short borrow costs). The "hold" shuffle comparison it mentions was a
+  one-off check and is not reproducible from the repo.
+- **AI_USAGE.md**: who wrote what. See "AI usage" below.
+- **docs/amihud_survivorship.md**: the explainer for the main finding.
+- **docs/rerun_20k_comparison.md**: the rerun tables.
+- **README.md**: gained a "Quick start" section and a short
+  "Permutation test results" paragraph. It still describes the
+  `quantlab` library and does not yet describe the app.
+
+Tests added: 77 (561 total) across tests/test_significance.py,
+tests/test_backtest_pipeline.py, tests/test_api.py and
+tests/test_run_permutations_cli.py.
+
+### AI usage (AI_USAGE.md)
+
+The project discloses how AI was used, and commit messages are tagged
+to match ("hand-written", "Claude Code", "drafted with Claude chat").
+
+- Hand-written by Michael: `permute_within_date`, `permutation_pvalue`,
+  `bonferroni_adjust`, and their tests.
+- AI-assisted (Claude Code, reviewed by Michael): pipeline.py,
+  run_permutations.py including `--config`, compare_permutations.py,
+  app/api.py, CONTRACT.md, the data extension to 2005 and EA removal,
+  shipping the results.
+- Drafted with Claude chat, edited and approved by Michael: verdict
+  text, the survivorship note, LIMITATIONS.md, parts of the Amihud
+  explainer.
+- Methodology decisions (gross significance test, Bonferroni, the
+  cutoffs, dropping roll_spread, featuring the survivorship result)
+  were made by Michael.
+
+Any AI session that changes code must keep this accurate: update
+AI_USAGE.md in the same change, and do not rewrite the three
+hand-written functions or their tests without Michael asking for it,
+because that would make the disclosure untrue.
+
+
 # Current Development Stage
 
-There is no active checkpoint. The architecture.md contract (sections
-4.1 through 4.9: data, research, backtest, portfolio, risk, ml,
-analytics, viz, fundamentals) is fully built, tested, and documented.
+The current focus is the QFRP web app, the team's entry for the
+Congressional App Challenge. This replaces "no active checkpoint".
+
+## Congressional App Challenge scope
+
+Source note: the repository never names the competition. That the app
+is for the Congressional App Challenge comes from Michael (2026-10-04).
+Target submission is Oct 22, 2026; the competition deadline is Oct 26,
+2026. A demo video of 1 to 3 minutes is planned and is the most
+important deliverable. Other submission and judging rules are not
+recorded in the repo; ask Michael rather than assuming them.
+
+What the entry is, as built:
+
+- A web app that lets someone pick a well-known trading factor and a
+  date range, see its backtest, and then see whether the result beats
+  luck. The lesson it teaches is that a good-looking backtest is easy
+  to find by trying many options, and that the honest p-value has to
+  account for how many were tried.
+- Team: Michael (research, statistics, `app/api.py`) and BP (React
+  frontend plus a FastAPI bridge in `app/ui/`).
+- Fixed menu: 10 price factors x 5 periods = 50 precomputed
+  configurations. A session counter of configurations viewed drives the
+  Bonferroni adjustment and the verdict.
+- Featured result: Amihud illiquidity passing the test while being
+  explained by survivorship bias.
+
+In scope:
+
+- keeping `app/api.py`, CONTRACT.md and the shipped results consistent
+- wording: verdicts, limitations, the survivorship explainer
+- supporting BP's integration
+- keeping AI_USAGE.md and LIMITATIONS.md accurate
+
+Out of scope for the entry (do not add without Michael asking):
+
+- letting users run arbitrary backtests or choose their own settings
+- fundamental factors (free data has no real history before about 2025)
+- the ML combination work (Checkpoints 8, 10, 11); the app shows
+  single factors only
+- new factors, new periods, or regenerating the shipped results. Any of
+  these changes the 50 files and invalidates the rerun comparison.
+- anything that reads as trading advice
+
+Open items:
+
+- The frontend is not on master. It lives on `origin/bp-frontend`
+  (`app/ui/server.py`, `app/ui/frontend/`). As of 2026-10-04 that
+  branch has 4 commits master lacks and is missing 8 of master's. On
+  master, `app/ui/` is an empty untracked folder.
+- CONTRACT.md section 8 still lists "BP: update server.py and the
+  Analyzer page to the v2 field names" as open. BP's server.py is done
+  (commit 743aa95). His commit 4bc3e4d (2026-10-04) updated the Analyzer
+  page's metric cards, but PermutationHistogram.jsx was still a stub as
+  of that commit, so the histogram is not built yet.
+- Benchmark curve: v1 had an equal-weight long-only basket; it is not
+  precomputed. Either add a precompute step or drop it from the UI.
+- Deployment: the server needs `pip install -e .` from the repo root;
+  the result files ship with the checkout. No deployment is recorded
+  in the repo.
+- The viewed-count resets on page refresh (LIMITATIONS.md).
+- Small document defects: section 1 of docs/amihud_survivorship.md
+  repeats its first paragraph, and one LIMITATIONS.md bullet starts
+  with a doubled "- -".
+
+## Research framework
+
+The architecture.md contract (sections 4.1 through 4.9: data, research,
+backtest, portfolio, risk, ml, analytics, viz, fundamentals) is fully
+built, tested, and documented.
 
 Real-data factor experiments (single or ML-combined) run through
 notebooks/factor_research.ipynb with a config-selectable model
 (`ML_MODEL`: Ridge baseline or gradient boosting challenger, Checkpoint
 11); the next model rung to compare there is stacked ensembles.
 
-docs/research_roadmap.md is the plan of record for future work:
+docs/research_roadmap.md is the plan of record for research work after
+the app:
 
 - Stage 5 (next): sentiment / NLP — outlined only, DATA-GATED: it needs
   a genuinely point-in-time text source (SEC EDGAR full text is the free
@@ -494,10 +860,13 @@ When continuing:
 - README.md
 - docs/architecture.md
 - existing tests
+- for anything touching the app: CONTRACT.md, LIMITATIONS.md, AI_USAGE.md
 
 3. Do not redesign the architecture without a strong reason.
 
-4. Preserve existing interfaces.
+4. Preserve existing interfaces. The names and types in CONTRACT.md are
+   an agreement with BP: do not change them, or CONTRACT.md itself,
+   without Michael and BP both agreeing. Do not edit `app/ui/`.
 
 5. Prioritize:
 
@@ -517,3 +886,7 @@ Before completing any future checkpoint:
 - verify existing functionality still works
 - add tests for new functionality
 - document important assumptions
+- if a change could alter any backtest number, the shipped results in
+  `results/permutations/` no longer match the code: say so, and do not
+  regenerate them without Michael asking
+- update AI_USAGE.md when AI-written code is added or changed
