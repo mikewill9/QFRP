@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import PermutationHistogram from "../components/PermutationHistogram.jsx";
 
 import Plot from "react-plotly.js";
 import { apiFetch } from "../api.js";
@@ -24,6 +25,13 @@ function formatPercent(value) {
 }
 
 function formatNumber(value, digits = 2) {
+  return Number(value).toFixed(digits);
+}
+function formatNullableNumber(value, digits = 2) {
+  if (value == null) {
+    return "N/A";
+  }
+
   return Number(value).toFixed(digits);
 }
 
@@ -109,7 +117,9 @@ function AnalyzerPage() {
       const analysisData = await apiFetch(
         `/api/analysis?factor_key=${encodeURIComponent(
           factorKey,
-        )}&period_key=${encodeURIComponent(periodKey)}`,
+        )}&period_key=${encodeURIComponent(
+          periodKey,
+        )}&n_configs_viewed=${nextViewed.length}`,
       );
 
       const verdictData = await apiFetch("/api/verdict", {
@@ -259,9 +269,15 @@ function AnalyzerPage() {
 
               <div className="metric-grid">
                 <Metric
-                  label="Sharpe"
-                  value={formatNumber(result.sharpe)}
-                  tone={metricTone(result.sharpe)}
+                  label="Sharpe (1x costs)"
+                  value={formatNullableNumber(result.sharpe_1x)}
+                  tone={metricTone(result.sharpe_1x)}
+                />
+
+                <Metric
+                  label="Gross Sharpe"
+                  value={formatNullableNumber(result.sharpe_gross)}
+                  tone={metricTone(result.sharpe_gross)}
                 />
 
                 <Metric
@@ -281,7 +297,10 @@ function AnalyzerPage() {
                   value={formatPercent(result.hit_rate)}
                 />
 
-                <Metric label="Trades" value={String(result.n_trades)} />
+                <Metric
+                  label="Turnover"
+                  value={`${formatNumber(result.turnover, 2)}x / year`}
+                />
               </div>
 
               <div className="chart-card">
@@ -289,8 +308,8 @@ function AnalyzerPage() {
                   <h3>Equity curve</h3>
 
                   <p>
-                    Strategy performance with the equal-weight long-only
-                    universe shown for context.
+                    Cumulative strategy performance after 1x modeled trading
+                    costs.
                   </p>
                 </div>
 
@@ -309,22 +328,6 @@ function AnalyzerPage() {
 
                       line: {
                         width: 3,
-                      },
-                    },
-
-                    {
-                      x: result.equity_curve.map((point) => point.date),
-
-                      y: result.equity_curve.map((point) => point.benchmark),
-
-                      type: "scatter",
-
-                      mode: "lines",
-
-                      name: "Equal-weight context",
-
-                      line: {
-                        width: 2,
                       },
                     },
                   ]}
@@ -352,95 +355,35 @@ function AnalyzerPage() {
               <div className="chart-card">
                 <div className="card-heading split-heading">
                   <div>
-                    <h3>Permutation test</h3>
+                    <h3>Gross Sharpe significance test</h3>
 
                     <p>
                       {result.n_permutations.toLocaleString()} reshuffles of the
-                      same factor, compared with the observed Sharpe.
+                      same factor, compared with the observed gross Sharpe.
                     </p>
                   </div>
 
                   <div className="p-value-box">
-                    <span>Raw p-value</span>
+                    <div>
+                      <span>Raw p-value</span>
+                      <strong>{formatPercent(result.p_value)}</strong>
+                    </div>
 
-                    <strong>{formatPercent(result.p_value)}</strong>
+                    <div>
+                      <span>Adjusted p-value</span>
+                      <strong>{formatPercent(result.adjusted_p_value)}</strong>
+                    </div>
+
+                    <div>
+                      <span>Configurations viewed</span>
+                      <strong>{result.k}</strong>
+                    </div>
                   </div>
                 </div>
 
-                <Plot
-                  data={[
-                    {
-                      x: result.null_sharpes,
-
-                      type: "histogram",
-
-                      name: "Reshuffled Sharpe",
-
-                      opacity: 0.9,
-                    },
-                  ]}
-                  layout={baseChartLayout({
-                    xaxis: {
-                      title: "Sharpe ratio",
-
-                      gridcolor: "#f3f4f6",
-                    },
-
-                    yaxis: {
-                      title: "Count",
-
-                      gridcolor: "#e5e7eb",
-                    },
-
-                    shapes: [
-                      {
-                        type: "line",
-
-                        x0: result.sharpe,
-
-                        x1: result.sharpe,
-
-                        y0: 0,
-
-                        y1: 1,
-
-                        yref: "paper",
-
-                        line: {
-                          width: 3,
-
-                          dash: "dash",
-                        },
-                      },
-                    ],
-
-                    annotations: [
-                      {
-                        x: result.sharpe,
-
-                        y: 1,
-
-                        yref: "paper",
-
-                        text: `Observed Sharpe: ${formatNumber(result.sharpe)}`,
-
-                        showarrow: true,
-
-                        arrowhead: 2,
-
-                        ax: 45,
-
-                        ay: 35,
-                      },
-                    ],
-                  })}
-                  config={{
-                    displayModeBar: false,
-
-                    responsive: true,
-                  }}
-                  useResizeHandler
-                  className="plot"
+                <PermutationHistogram
+                  result={result}
+                  formatNumber={formatNumber}
                 />
               </div>
 
