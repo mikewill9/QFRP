@@ -81,3 +81,5 @@ function PermutationHistogram({ result, formatNumber }) {
     />
   );
 }
+
+export default PermutationHistogram;
