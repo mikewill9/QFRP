@@ -220,15 +220,3 @@ Each factor/period config is tested with 2,000 within-date shuffles. 14 borderli
 quantlab is a research framework. Nothing in this repository is investment
 advice, and simulated results do not represent live trading.
 
-## Quick start
-
-Tested on Python 3.14 on macOS.
-
-```
-git clone https://github.com/mikewill9/QFRP.git
-cd QFRP
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python -m pytest -q
-```
