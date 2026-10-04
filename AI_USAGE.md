@@ -18,6 +18,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - CONTRACT.md
 - Shipping precomputed results
 - High-precision rerun tooling: --config flag in run_permutations.py, compare_permutations.py, tests/test_run_permutations_cli.py
+- PROJECT_HANDOFF.md update (post-Checkpoint 11 section)
 
 
 ## Drafted with Claude (chat), edited and approved by Michael
