@@ -210,6 +210,26 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 python -m pytest -q
 ```
+## Running the app
+
+The app has two parts that run at the same time, each in its own terminal: a Python server and a React website. Tested on macOS with Node 26.
+
+**Terminal 1: Python server** (from the repo root, with `.venv` active)
+
+```
+pip install -r app/ui/requirements.txt
+uvicorn app.ui.server:app --port 8000
+```
+
+**Terminal 2: website** (needs Node.js; on a Mac, `brew install node`)
+
+```
+cd app/ui/frontend
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173 and click **Open the analyzer**. Leave both terminals running while you use the app.
 
 ## Permutation test results
 

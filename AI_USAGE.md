@@ -26,6 +26,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - LIMITATIONS.md
 - Planning and teamwork messages and outlines
 - docs/amihud_survivorship.md: outline and some wording drafted with Claude chat; data checks run, claims verified, and final text written by Michael
+- Running app directions in README.md
 
 ## Methodology decisions (made by Michael after reviewing options with Claude)
 - Zero-cost significance test, Bonferroni correction, verdict cutoffs, dropping roll_spread, featuring the survivorship result
