@@ -39,6 +39,13 @@ The script refuses to run if the cache would need a download, so it can
 never stitch new Yahoo prices onto an old cache (different dividend
 adjustment bases create fake jumps at the seam).
 
+To rerun only specific configs (e.g. borderline ones at a higher N, into a
+separate directory with an independent seed), repeat --config:
+
+    python scripts/run_permutations.py --n 20000 --base-seed 20261002 \
+        --out-dir results/permutations_hp \
+        --config st_reversal:2020_2024 --config price_to_ma:2015_2019
+
 Output: one JSON per config in outputs/permutations/{factor}_{period}.json.
 Configs whose JSON already exists are skipped, so an interrupted run can
 simply be restarted (an existing JSON made with a different N or base seed
@@ -324,11 +331,29 @@ def _run_config_star(args: tuple[str, str, int, int, Path]) -> tuple[str, float]
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def parse_args() -> argparse.Namespace:
+def config_arg(text: str) -> tuple[str, str]:
+    """argparse type for --config: "factor:period" -> (factor, period)."""
+    factor, sep, period = text.partition(":")
+    if not sep or factor not in PRICE_FACTOR_BUILDERS or period not in PERIODS:
+        raise argparse.ArgumentTypeError(
+            f"expected FACTOR:PERIOD with FACTOR in {sorted(PRICE_FACTOR_BUILDERS)} "
+            f"and PERIOD in {list(PERIODS)}, got {text!r}"
+        )
+    return factor, period
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--n", type=int, default=DEFAULT_N, help="shuffles per config")
     parser.add_argument("--factor", choices=sorted(PRICE_FACTOR_BUILDERS), help="run only this factor")
     parser.add_argument("--period", choices=list(PERIODS), help="run only this period")
+    parser.add_argument(
+        "--config",
+        type=config_arg,
+        action="append",
+        metavar="FACTOR:PERIOD",
+        help="run only this config (repeatable; replaces --factor/--period)",
+    )
     parser.add_argument("--base-seed", type=int, default=DEFAULT_BASE_SEED)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument(
@@ -337,19 +362,28 @@ def parse_args() -> argparse.Namespace:
         default=max(1, (os.cpu_count() or 1) - 2),
         help="parallel processes (default: all cores but 2)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.n < 1:
         parser.error("--n must be >= 1")
+    if args.config and (args.factor or args.period):
+        parser.error("--config cannot be combined with --factor or --period")
     return args
+
+
+def selected_configs(args: argparse.Namespace) -> list[tuple[str, str]]:
+    """The (factor, period) pairs to run: --config list, else the factor x period grid."""
+    if args.config:
+        return list(dict.fromkeys(args.config))  # drop repeats, keep order
+    factors = [args.factor] if args.factor else list(PRICE_FACTOR_BUILDERS)
+    periods = [args.period] if args.period else list(PERIODS)
+    return [(f, p) for f in factors for p in periods]
 
 
 def main() -> None:
     args = parse_args()
     check_cache_complete()
 
-    factors = [args.factor] if args.factor else list(PRICE_FACTOR_BUILDERS)
-    periods = [args.period] if args.period else list(PERIODS)
-    configs = [(f, p) for f in factors for p in periods]
+    configs = selected_configs(args)
     todo, mismatched = [], []
     for f, p in configs:
         path = args.out_dir / f"{f}_{p}.json"
