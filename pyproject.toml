@@ -47,8 +47,8 @@ dev = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/michaelwill9/quantlab/tree/main/docs"
-Source = "https://github.com/michaelwill9/quantlab"
+Documentation = "https://github.com/mikewill9/QFRP/tree/master/docs"
+Source = "https://github.com/mikewill9/QFRP"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/quantlab"]

@@ -44,9 +44,12 @@ Completed checkpoints:
 - Checkpoint 2: research subsystem
 - Checkpoint 1: initial quantlab framework
 
-Latest checkpoint commit:
+Latest commit (2026-10-11, branch bp-frontend):
 
-9d753c1 Checkpoint 10: ML combination wiring and general factor research notebook
+d60a872 README: add app launch steps
+
+Work after Checkpoint 11 is described in the "Post-Checkpoint 11" and
+"Congressional App Challenge scope" sections below.
 
 Between checkpoints 9 and 10 a research-experiments commit (b067be5)
 ran factor testing on US_LARGE_CAP_149 (real Yahoo data) in
@@ -710,8 +713,7 @@ Design decisions worth knowing:
   the four functions and reads named fields, and never imports
   `quantlab` directly. Changes to CONTRACT.md need both to agree. It
   defines every field, the verdict bands, error-to-HTTP mapping and
-  deployment needs. Known stale line: section 5 still says
-  `SURVIVORSHIP_NOTE` is "empty for now"; it has since been written.
+  deployment needs.
 - **LIMITATIONS.md**: the honest list. Data (survivorship bias, the
   universe growing from 126 to 148 names, price factors only, known
   Yahoo errors such as DHR on 2016-07-05), method (gross significance,
@@ -723,9 +725,10 @@ Design decisions worth knowing:
 - **AI_USAGE.md**: who wrote what. See "AI usage" below.
 - **docs/amihud_survivorship.md**: the explainer for the main finding.
 - **docs/rerun_20k_comparison.md**: the rerun tables.
-- **README.md**: gained a "Quick start" section and a short
-  "Permutation test results" paragraph. It still describes the
-  `quantlab` library and does not yet describe the app.
+- **README.md**: gained a "Quick start" section, a "Running the app"
+  section with the launch steps, a short "Permutation test results"
+  paragraph and a "Libraries and tools" section. Its opening sections
+  still introduce the `quantlab` library rather than the app.
 
 Tests added: 77 (561 total) across tests/test_significance.py,
 tests/test_backtest_pipeline.py, tests/test_api.py and
@@ -803,24 +806,17 @@ Out of scope for the entry (do not add without Michael asking):
 
 Open items:
 
-- The frontend is not on master. It lives on `origin/bp-frontend`
-  (`app/ui/server.py`, `app/ui/frontend/`). As of 2026-10-04 that
-  branch has 4 commits master lacks and is missing 8 of master's. On
-  master, `app/ui/` is an empty untracked folder.
-- CONTRACT.md section 8 still lists "BP: update server.py and the
-  Analyzer page to the v2 field names" as open. BP's server.py is done
-  (commit 743aa95). His commit 4bc3e4d (2026-10-04) updated the Analyzer
-  page's metric cards, but PermutationHistogram.jsx was still a stub as
-  of that commit, so the histogram is not built yet.
+- The frontend is not on master yet. It lives on `origin/bp-frontend`
+  (`app/ui/server.py`, `app/ui/frontend/`). As of 2026-10-11, master
+  has been merged into `bp-frontend`, so that branch is ahead of master
+  and is missing nothing from it. Merging `bp-frontend` back into
+  master is still to do before submission.
 - Benchmark curve: v1 had an equal-weight long-only basket; it is not
   precomputed. Either add a precompute step or drop it from the UI.
 - Deployment: the server needs `pip install -e .` from the repo root;
   the result files ship with the checkout. No deployment is recorded
   in the repo.
 - The viewed-count resets on page refresh (LIMITATIONS.md).
-- Small document defects: section 1 of docs/amihud_survivorship.md
-  repeats its first paragraph, and one LIMITATIONS.md bullet starts
-  with a doubled "- -".
 
 ## Research framework
 

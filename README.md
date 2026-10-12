@@ -235,6 +235,36 @@ Then open http://localhost:5173 and click **Open the analyzer**. Leave both term
 
 Each factor/period config is tested with 2,000 within-date shuffles. 14 borderline configs were rerun at 20,000 shuffles with a fresh seed, and no verdict changed at k=1. See `docs/rerun_20k_comparison.md`.
 
+## Libraries and tools
+
+Every library the project depends on is open source. The lists below
+come from `pyproject.toml`, `app/ui/requirements.txt` and
+`app/ui/frontend/package.json`.
+
+### Research engine (Python)
+
+- **NumPy**: array math and the seeded random number generator behind the shuffles
+- **pandas**: the dates x symbols tables used for prices, signals and weights
+- **SciPy**: portfolio optimization and the statistics in the risk metrics
+- **scikit-learn**: the ridge, random forest and gradient boosting models
+- **Matplotlib**: research charts and tearsheets
+- **PyArrow**: reads and writes the parquet files of the local data cache
+- **yfinance** (optional `data` extra): downloads Yahoo Finance prices and statements
+- **LightGBM** (optional `ml` extra): an alternative gradient boosting backend
+- **Hatchling**: build backend that makes `pip install -e .` work
+- **pytest**: runs the test suite
+
+### App (server and frontend)
+
+- **FastAPI**: the Python web server that exposes `app/api.py` to the website
+- **Pydantic**: checks the data the website sends to the server
+- **Uvicorn**: runs the FastAPI server
+- **React** and **React DOM**: the website's user interface
+- **React Router** (`react-router-dom`): navigation between the home and analyzer pages
+- **Plotly.js** (`plotly.js-dist-min`): draws the interactive charts
+- **react-plotly.js**: lets React components use Plotly charts
+- **Vite**: development server and build tool for the website
+
 ## Disclaimer
 
 quantlab is a research framework. Nothing in this repository is investment

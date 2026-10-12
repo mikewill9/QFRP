@@ -11,7 +11,7 @@
 - **Shuffle method.** Stocks are reshuffled every rebalance. A "hold" shuffle that keeps random picks fixed could produce a wider null. We checked this and found no difference at 100 shuffles, but that sample can't rule out a small effect.
 - **Bonferroni is conservative.** It assumes tests are independent, but periods overlap (2005–2024 contains the other four), so the adjustment is stricter than necessary.
 - **Minimum p-value.** With 2,000 shuffles, p can't go below about 0.0005.
-- - **Not every borderline config was rerun.** market_beta 2005_2024 sits near a verdict cutoff at higher k (2 to 5) and was not rerun at 20,000 shuffles (about 11 hours), so its verdict uses 2,000 shuffles.
+- **Not every borderline config was rerun.** market_beta 2005_2024 sits near a verdict cutoff at higher k (2 to 5) and was not rerun at 20,000 shuffles (about 11 hours), so its verdict uses 2,000 shuffles.
 
 ## App
 - **Counter resets on page refresh.** A user could avoid the multiple-testing penalty by refreshing.
