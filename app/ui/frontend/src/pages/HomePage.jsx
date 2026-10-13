@@ -12,7 +12,7 @@ function HomePage() {
 
         <p className="hero-copy">
           QFRP lets you explore quantitative factors and compare their observed
-          performance with 1,000 reshuffles of the same factor. As you test more
+          performance with 2,000 reshuffles of the same factor. As you test more
           configurations, the app also shows why an apparently strong result can
           become less convincing.
         </p>

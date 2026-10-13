@@ -152,9 +152,10 @@ function AnalyzerPage() {
     }
   }
 
-  const placeholderData = result?.limitations?.some((item) =>
-    item.startsWith("PLACEHOLDER"),
-  );
+  const verdictClass =
+    verdict?.label === "FAIL" && verdict?.reversed
+      ? "verdict-reversed"
+      : `verdict-${verdict?.label?.toLowerCase()}`;
 
   return (
     <div className="analyzer-page page-width">
@@ -261,10 +262,6 @@ function AnalyzerPage() {
 
                   <h2>{result.factor_label}</h2>
                 </div>
-
-                {placeholderData && (
-                  <span className="demo-badge">DEMO DATA</span>
-                )}
               </div>
 
               <div className="metric-grid">
@@ -398,6 +395,18 @@ function AnalyzerPage() {
                     </p>
                   </div>
 
+                  <div className="cost-stress-values">
+                    {result.cost_stress.map((point) => (
+                      <div key={point.multiplier}>
+                        <span>{point.multiplier}x cost</span>
+
+                        <strong>
+                          Sharpe {formatNullableNumber(point.sharpe)}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+
                   <Plot
                     data={[
                       {
@@ -435,9 +444,7 @@ function AnalyzerPage() {
                   />
                 </div>
 
-                <div
-                  className={`verdict-card verdict-${verdict.label.toLowerCase()}`}
-                >
+                <div className={`verdict-card ${verdictClass}`}>
                   <div className="verdict-label">{verdict.label}</div>
 
                   <h3>{verdict.headline}</h3>
@@ -462,6 +469,66 @@ function AnalyzerPage() {
 
                       <strong>{verdict.n_configs_viewed}</strong>
                     </div>
+                    {verdict.reversed && (
+                      <>
+                        <div>
+                          <span>Reverse p</span>
+                          <strong>
+                            {formatPercent(verdict.raw_reverse_p_value)}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Adjusted reverse p</span>
+                          <strong>
+                            {formatPercent(verdict.adjusted_reverse_p_value)}
+                          </strong>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="test-details-card">
+                <h3>Test details</h3>
+
+                <div className="test-details-grid">
+                  <div>
+                    <span>Permutations run</span>
+                    <strong>{result.n_permutations.toLocaleString()}</strong>
+                  </div>
+
+                  <div>
+                    <span>Dropped null draws</span>
+                    <strong>{result.n_dropped ?? "N/A"}</strong>
+                  </div>
+
+                  <div>
+                    <span>Real turnover</span>
+                    <strong>{formatNumber(result.turnover, 2)}x / year</strong>
+                  </div>
+
+                  <div>
+                    <span>Null turnover</span>
+                    <strong>
+                      {result.null_turnover == null
+                        ? "N/A"
+                        : `${formatNumber(result.null_turnover, 2)}x / year`}
+                    </strong>
+                  </div>
+                </div>
+                <div className="names-per-year">
+                  <span className="details-label">Names per year</span>
+
+                  <div className="names-per-year-grid">
+                    {Object.entries(result.names_per_year).map(
+                      ([year, count]) => (
+                        <div key={year}>
+                          <span>{year}</span>
+                          <strong>{formatNumber(count, 1)}</strong>
+                        </div>
+                      ),
+                    )}
                   </div>
                 </div>
               </div>
