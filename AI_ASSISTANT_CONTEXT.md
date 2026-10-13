@@ -37,9 +37,10 @@ Explain:
 
 # Current Project
 
-The user is building QuantResearchAI.
+The user is building QFRP.
 
-It is a quantitative research framework, not a trading bot.
+It is a quantitative research framework, not a trading bot. Its web app
+is the team's entry for the Congressional App Challenge.
 
 Purpose:
 
@@ -87,10 +88,15 @@ ML combination wiring and the general factor research notebook
 Checkpoint 11:
 Gradient boosting challenger (ML_MODEL config in the research notebook)
 
+After Checkpoint 11:
+Permutation significance test and the web app (app/api.py, app/ui/)
+
 Current development:
-Real-data factor research through notebooks/factor_research.ipynb
-(Ridge baseline vs gradient boosting challenger); next roadmap stages
-are data-gated (see PROJECT_HANDOFF.md and docs/research_roadmap.md)
+Congressional App Challenge submission (deadline Oct 26, 2026): the
+permutation significance test, the app in app/api.py and app/ui/, and
+submission materials. Portfolio construction, EDGAR sentiment and the
+asset-growth factor are parked until after the submission (see
+PROJECT_HANDOFF.md)
 
 ---
 

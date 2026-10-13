@@ -264,8 +264,10 @@ below `PASS_BELOW`, the label stays **FAIL** (so existing UI logic works), but
 the explanation says the opposite strategy would have looked strong. Show it
 differently from an ordinary FAIL if you can.
 
-**Survivorship note.** `SURVIVORSHIP_NOTE` in `app/api.py` (empty for now) is
-appended to every PASS explanation once Michael writes it.
+**Survivorship note.** `SURVIVORSHIP_NOTE` in `app/api.py` is a short caution,
+written by Michael, that the test checks for luck and not for survivorship bias
+in the stock list. `verdict_for` appends it to every PASS explanation, so it is
+already part of the `explanation` string the frontend receives.
 
 `n_configs_viewed` must be an integer >= 1 (same errors as `k` in §3). Track it
 in frontend session state — increment it each time a new (factor, period) pair
@@ -317,7 +319,7 @@ Michael does not edit `app/ui/`. BP does not edit anything else.
 - [x] `limitations` strings — drafted in `app/api.py`, Michael to review
 - [ ] Benchmark curve: an equal-weight long-only basket was in v1 but is not
       precomputed. Add a separate precompute step, or drop it from the UI.
-- [ ] BP: update `app/ui/server.py` and the Analyzer page to the v2 field names
+- [x] BP: update `app/ui/server.py` and the Analyzer page to the v2 field names
       (§4 "Changes from v1"), and optionally show `reversed` verdicts (§5).
 - [x] How the result JSONs reach the deployed server — committed in
       `results/permutations/`

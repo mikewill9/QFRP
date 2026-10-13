@@ -1,8 +1,8 @@
-# QuantResearchAI Claude Code Instructions
+# QFRP Claude Code Instructions
 
 ## Project Overview
 
-QuantResearchAI is a Python quantitative finance research framework.
+QFRP is a Python quantitative finance research framework.
 
 The goal is to build a serious research environment for:
 - financial data analysis
@@ -82,15 +82,20 @@ A simpler correct model is better than a complicated unreliable one.
 
 ## Current Development Stage
 
-The project has completed:
+The current focus is the Congressional App Challenge submission
+(deadline Oct 26, 2026):
 
-- data infrastructure
-- research framework
-- backtesting engine
+- the permutation significance test
+- the app in `app/api.py` and `app/ui/`
+- submission materials
 
-The current focus is:
+Parked until after the submission:
 
-Portfolio construction and risk management.
+- portfolio construction
+- EDGAR sentiment
+- the asset-growth factor
+
+See PROJECT_HANDOFF.md for the details.
 
 ---
 

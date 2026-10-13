@@ -198,7 +198,75 @@ masks over a 150-name seed list, survivorship caveats documented).
 All subsystems in `docs/architecture.md` are implemented; see
 `docs/research_roadmap.md` for the staged research plan from here.
 
+## Quick start
+
+Tested on Python 3.14 on macOS.
+
+```
+git clone https://github.com/mikewill9/QFRP.git
+cd QFRP
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+python -m pytest -q
+```
+## Running the app
+
+The app has two parts that run at the same time, each in its own terminal: a Python server and a React website. Tested on macOS with Node 26.
+
+**Terminal 1: Python server** (from the repo root, with `.venv` active)
+
+```
+pip install -r app/ui/requirements.txt
+uvicorn app.ui.server:app --port 8000
+```
+
+**Terminal 2: website** (needs Node.js; on a Mac, `brew install node`)
+
+```
+cd app/ui/frontend
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173 and click **Open the analyzer**. Leave both terminals running while you use the app.
+
+## Permutation test results
+
+Each factor/period config is tested with 2,000 within-date shuffles. 14 borderline configs were rerun at 20,000 shuffles with a fresh seed, and no verdict changed at k=1. See `docs/rerun_20k_comparison.md`.
+
+## Libraries and tools
+
+Every library the project depends on is open source. The lists below
+come from `pyproject.toml`, `app/ui/requirements.txt` and
+`app/ui/frontend/package.json`.
+
+### Research engine (Python)
+
+- **NumPy**: array math and the seeded random number generator behind the shuffles
+- **pandas**: the dates x symbols tables used for prices, signals and weights
+- **SciPy**: portfolio optimization and the statistics in the risk metrics
+- **scikit-learn**: the ridge, random forest and gradient boosting models
+- **Matplotlib**: research charts and tearsheets
+- **PyArrow**: reads and writes the parquet files of the local data cache
+- **yfinance** (optional `data` extra): downloads Yahoo Finance prices and statements
+- **LightGBM** (optional `ml` extra): an alternative gradient boosting backend
+- **Hatchling**: build backend that makes `pip install -e .` work
+- **pytest**: runs the test suite
+
+### App (server and frontend)
+
+- **FastAPI**: the Python web server that exposes `app/api.py` to the website
+- **Pydantic**: checks the data the website sends to the server
+- **Uvicorn**: runs the FastAPI server
+- **React** and **React DOM**: the website's user interface
+- **React Router** (`react-router-dom`): navigation between the home and analyzer pages
+- **Plotly.js** (`plotly.js-dist-min`): draws the interactive charts
+- **react-plotly.js**: lets React components use Plotly charts
+- **Vite**: development server and build tool for the website
+
 ## Disclaimer
 
 quantlab is a research framework. Nothing in this repository is investment
 advice, and simulated results do not represent live trading.
+
