@@ -34,3 +34,6 @@ notebooks/.ipynb_checkpoints/
 
 .ipynb_checkpoints/
 Untitled*.ipynb
+
+# Frontend dependencies
+node_modules/
