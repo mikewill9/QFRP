@@ -23,6 +23,23 @@ function formatPercent(value) {
     maximumFractionDigits: 1,
   }).format(value);
 }
+function formatPValue(value) {
+  if (value == null || value === "") {
+    return "N/A";
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number < 0 || number > 1) {
+    return "N/A";
+  }
+
+  if (number < 0.001) {
+    return "<0.1%";
+  }
+
+  return formatPercent(number);
+}
 
 function formatNumber(value, digits = 2) {
   return Number(value).toFixed(digits);
@@ -363,12 +380,12 @@ function AnalyzerPage() {
                   <div className="p-value-box">
                     <div>
                       <span>Raw p-value</span>
-                      <strong>{formatPercent(result.p_value)}</strong>
+                      <strong>{formatPValue(result.p_value)}</strong>
                     </div>
 
                     <div>
                       <span>Adjusted p-value</span>
-                      <strong>{formatPercent(result.adjusted_p_value)}</strong>
+                      <strong>{formatPValue(result.adjusted_p_value)}</strong>
                     </div>
 
                     <div>
@@ -455,13 +472,13 @@ function AnalyzerPage() {
                     <div>
                       <span>Raw p</span>
 
-                      <strong>{formatPercent(verdict.raw_p_value)}</strong>
+                      <strong>{formatPValue(verdict.raw_p_value)}</strong>
                     </div>
 
                     <div>
                       <span>Adjusted p</span>
 
-                      <strong>{formatPercent(verdict.adjusted_p_value)}</strong>
+                      <strong>{formatPValue(verdict.adjusted_p_value)}</strong>
                     </div>
 
                     <div>
@@ -474,14 +491,14 @@ function AnalyzerPage() {
                         <div>
                           <span>Reverse p</span>
                           <strong>
-                            {formatPercent(verdict.raw_reverse_p_value)}
+                            {formatPValue(verdict.raw_reverse_p_value)}
                           </strong>
                         </div>
 
                         <div>
                           <span>Adjusted reverse p</span>
                           <strong>
-                            {formatPercent(verdict.adjusted_reverse_p_value)}
+                            {formatPValue(verdict.adjusted_reverse_p_value)}
                           </strong>
                         </div>
                       </>
