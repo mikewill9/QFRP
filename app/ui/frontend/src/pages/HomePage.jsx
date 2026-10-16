@@ -11,7 +11,7 @@ function HomePage() {
         <h1>Good backtest, or just good luck?</h1>
 
         <p className="hero-copy">
-          QFRP lets you explore quantitative factors and compare their observed
+          Fluke lets you explore quantitative factors and compare their observed
           performance with 2,000 reshuffles of the same factor. As you test more
           configurations, the app also shows why an apparently strong result can
           become less convincing.
@@ -75,7 +75,7 @@ function HomePage() {
 
         <p>
           Trying many ideas increases the chance that one looks impressive by
-          accident. QFRP turns that problem into an interactive experience: the
+          accident. Fluke turns that problem into an interactive experience: the
           more configurations you inspect, the more context the app adds to the
           result you are seeing.
         </p>

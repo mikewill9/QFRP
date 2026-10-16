@@ -6,8 +6,8 @@ function App() {
   return (
     <div className="site-shell">
       <header className="topbar">
-        <NavLink to="/" className="brand" aria-label="QFRP home">
-          QFRP
+        <NavLink to="/" className="brand" aria-label="Fluke home">
+          Fluke
         </NavLink>
 
         <nav className="nav-links" aria-label="Primary navigation">
@@ -28,7 +28,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <span>QFRP</span>
+        <span>Fluke</span>
         <span>Research output. Not investment advice.</span>
       </footer>
     </div>
