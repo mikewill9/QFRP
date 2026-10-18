@@ -22,6 +22,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - High-precision rerun tooling: --config flag in run_permutations.py, compare_permutations.py, tests/test_run_permutations_cli.py
 - PROJECT_HANDOFF.md update (post-Checkpoint 11 section)
 - Pre-submission documentation cleanup and the README libraries list
+- Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. Every statistical function (get_batch_analysis), every claim mapping and description (app/claims.py), and every user-facing sentence were left as marked stubs and written by hand afterward: Michael (backend), BP (frontend). See SCAFFOLD_TODO.md.
 
 ## Drafted with Claude (chat), edited and approved by Michael
 

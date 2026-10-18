@@ -59,7 +59,7 @@ function metricTone(value) {
   return "neutral";
 }
 
-function AnalyzerPage() {
+function AnalyzerPage({ embedded = false }) {
   const [factors, setFactors] = useState([]);
   const [periods, setPeriods] = useState([]);
 
@@ -175,28 +175,30 @@ function AnalyzerPage() {
       : `verdict-${verdict?.label?.toLowerCase()}`;
 
   return (
-    <div className="analyzer-page page-width">
-      <section className="page-heading">
-        <div>
-          <div className="eyebrow">FACTOR REALITY CHECK</div>
+    <div className={embedded ? "analyzer-embedded" : "analyzer-page page-width"}>
+      {!embedded && (
+        <section className="page-heading">
+          <div>
+            <div className="eyebrow">FACTOR REALITY CHECK</div>
 
-          <h1>Analyzer</h1>
+            <h1>Analyzer</h1>
 
-          <p>
-            Compare a factor's observed result with its permutation-based null
-            distribution.
-          </p>
-        </div>
+            <p>
+              Compare a factor's observed result with its permutation-based null
+              distribution.
+            </p>
+          </div>
 
-        <div
-          className="session-pill"
-          title="Unique factor-period combinations viewed in this browser tab"
-        >
-          <strong>{viewedConfigs.length}</strong>
+          <div
+            className="session-pill"
+            title="Unique factor-period combinations viewed in this browser tab"
+          >
+            <strong>{viewedConfigs.length}</strong>
 
-          <span>configurations viewed</span>
-        </div>
-      </section>
+            <span>configurations viewed</span>
+          </div>
+        </section>
+      )}
 
       <div className="analyzer-layout">
         <aside className="control-panel">

@@ -1,30 +1,27 @@
 import { Link } from "react-router-dom";
 
+// Layout machinery kept from the previous home page (hero, three-card grid,
+// closing section). Content is three blocks: the problem, who it's for,
+// where to start, plus two calls to action.
 function HomePage() {
   return (
     <div className="home-page page-width">
       <section className="hero">
-        <div className="eyebrow">
-          QUANTITATIVE RESEARCH • STATISTICAL TESTING
-        </div>
+        {/* >>> BP: hero eyebrow, headline and intro. If a permutation count is shown anywhere, use analysis.n_permutations from the API rather than a hard-coded number. <<< */}
+        <div className="eyebrow">[BP: HERO EYEBROW]</div>
 
-        <h1>Good backtest, or just good luck?</h1>
+        <h1>[BP: headline: good backtest, or just good luck?]</h1>
 
-        <p className="hero-copy">
-          Fluke lets you explore quantitative factors and compare their observed
-          performance with 2,000 reshuffles of the same factor. As you test more
-          configurations, the app also shows why an apparently strong result can
-          become less convincing.
-        </p>
+        <p className="hero-copy">[BP: two or three sentences: what Fluke is]</p>
 
         <div className="hero-actions">
-          <Link to="/analyzer" className="primary-button">
-            Open the analyzer
+          <Link to="/claims" className="primary-button">
+            [BP: CTA: explore a claim]
           </Link>
 
-          <a href="#how-it-works" className="secondary-button">
-            How it works
-          </a>
+          <Link to="/compare" className="secondary-button">
+            [BP: CTA: open the comparison lab]
+          </Link>
         </div>
       </section>
 
@@ -32,53 +29,40 @@ function HomePage() {
         <article className="purpose-card">
           <span className="step-number">01</span>
 
-          <h2>Choose a factor</h2>
+          {/* >>> BP: block 1, the problem <<< */}
+          <h2>[BP: heading: the problem]</h2>
 
-          <p>
-            Select one of the fixed factor and date-range combinations prepared
-            by the research layer.
-          </p>
+          <p>[BP: two sentences: why a strong-looking backtest can be luck]</p>
         </article>
 
         <article className="purpose-card">
           <span className="step-number">02</span>
 
-          <h2>Compare with chance</h2>
+          {/* >>> BP: block 2, who it's for <<< */}
+          <h2>[BP: heading: who it's for]</h2>
 
-          <p>
-            See where the real Sharpe ratio falls against the null distribution
-            from reshuffled factor scores.
-          </p>
+          <p>[BP: two sentences: young investors, clubs, classrooms]</p>
         </article>
 
         <article className="purpose-card">
           <span className="step-number">03</span>
 
-          <h2>Account for searching</h2>
+          {/* >>> BP: block 3, where to start <<< */}
+          <h2>[BP: heading: where to start]</h2>
 
-          <p>
-            Your session counter tracks unique configurations viewed so the
-            verdict reflects multiple testing.
-          </p>
+          <p>[BP: two sentences: start with a claim, then ask your own questions in the lab]</p>
         </article>
       </section>
 
       <section className="why-section">
         <div>
-          <div className="eyebrow">WHY WE BUILT IT</div>
+          {/* >>> BP: closing section eyebrow and heading <<< */}
+          <div className="eyebrow">[BP: WHY WE BUILT IT]</div>
 
-          <h2>
-            Backtests can look persuasive even when the underlying signal is
-            weak.
-          </h2>
+          <h2>[BP: one-line heading on the counter idea]</h2>
         </div>
 
-        <p>
-          Trying many ideas increases the chance that one looks impressive by
-          accident. Fluke turns that problem into an interactive experience: the
-          more configurations you inspect, the more context the app adds to the
-          result you are seeing.
-        </p>
+        <p>[BP: two or three sentences: the more you look, the higher the bar]</p>
       </section>
     </div>
   );

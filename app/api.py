@@ -49,6 +49,7 @@ __all__ = [
     "ResultNotComputedError",
     "Verdict",
     "get_analysis",
+    "get_batch_analysis",
     "list_factors",
     "list_periods",
     "verdict_for",
@@ -539,3 +540,29 @@ def verdict_for(result: AnalysisResult, n_configs_viewed: int) -> Verdict:
         raw_reverse_p_value=raw_rev,
         adjusted_reverse_p_value=adjusted_rev,
     )
+
+
+def get_batch_analysis(
+    configs: list[tuple[str, str]], k: int
+) -> list[tuple[AnalysisResult, Verdict]]:
+    """Analysis + verdict for several (factor_key, period_key) configs at one k.
+
+    Used by the app when several results are shown on one screen (a factor
+    across all periods, two factors side by side) so that every result on
+    that screen is adjusted for the same number of configurations.
+
+    Spec (Michael implements):
+    - validate ``k`` with ``_check_k``;
+    - ``k`` must be >= the number of UNIQUE configs in ``configs``
+      (a screen cannot show more configurations than the session has
+      counted); otherwise raise ValueError;
+    - keep ``configs`` in the order given; decide (and document in the
+      docstring) whether duplicates are dropped or rejected;
+    - for each config: ``get_analysis(factor_key, period_key, k)`` then
+      ``verdict_for(result, k)``;
+    - let KeyError / ResultNotComputedError / ValueError / TypeError from
+      those calls propagate unchanged (the HTTP layer maps them).
+    """
+    # >>> MICHAEL: implement per the spec above. ~15 lines.
+    raise NotImplementedError("MICHAEL: get_batch_analysis")
+    # <<< MICHAEL

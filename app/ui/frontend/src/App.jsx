@@ -1,6 +1,7 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import HomePage from "./pages/HomePage.jsx";
-import AnalyzerPage from "./pages/AnalyzerPage.jsx";
+import ClaimExplorerPage from "./pages/ClaimExplorerPage.jsx";
+import ComparisonLabPage from "./pages/ComparisonLabPage.jsx";
 
 function App() {
   return (
@@ -15,7 +16,9 @@ function App() {
             Home
           </NavLink>
 
-          <NavLink to="/analyzer">Analyzer</NavLink>
+          <NavLink to="/claims">Explore Claims</NavLink>
+
+          <NavLink to="/compare">Comparison Lab</NavLink>
         </nav>
       </header>
 
@@ -23,13 +26,20 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
 
-          <Route path="/analyzer" element={<AnalyzerPage />} />
+          <Route path="/claims" element={<ClaimExplorerPage />} />
+
+          <Route path="/compare" element={<ComparisonLabPage />} />
+
+          {/* The old Analyzer lives on under Comparison Lab → Advanced. */}
+          <Route path="/analyzer" element={<Navigate to="/compare" replace />} />
         </Routes>
       </main>
 
       <footer className="footer">
         <span>Fluke</span>
-        <span>Research output. Not investment advice.</span>
+
+        {/* >>> BP: footer line <<< */}
+        <span>[BP: research and education only, not investment advice]</span>
       </footer>
     </div>
   );

@@ -8,18 +8,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 from app.api import (
+    FAIL_ABOVE,
+    PASS_BELOW,
     ResultNotComputedError,
     get_analysis,
+    get_batch_analysis,
     list_factors,
     list_periods,
     verdict_for,
 )
+from app.claims import list_claims
 
 
 # Creates the FastAPI app.
 # This is the bridge between the React frontend and Michael's Python API.
 app = FastAPI(
-    title="QFRP Web API",
+    title="Fluke API",
     version="2.0.0",
 )
 
@@ -73,6 +77,38 @@ class VerdictRequest(BaseModel):
     # Python treats True and False like numbers in some cases.
     # The contract says booleans should not count as valid values for k,
     # so this makes sure they are rejected.
+    @field_validator(
+        "n_configs_viewed",
+        mode="before",
+    )
+    @classmethod
+    def reject_boolean_count(
+        cls,
+        value,
+    ):
+        if isinstance(value, bool):
+            raise ValueError(
+                "n_configs_viewed must be an integer of at least 1."
+            )
+
+        return value
+
+
+# One (factor, period) pair inside a batch request.
+class BatchConfig(BaseModel):
+    factor_key: str
+    period_key: str
+
+
+# What React sends when several results share one screen
+# (a factor across all periods, or two factors side by side).
+# Every result in the batch is adjusted for the same n_configs_viewed.
+class BatchRequest(BaseModel):
+    configs: list[BatchConfig] = Field(min_length=1, max_length=10)
+
+    n_configs_viewed: int = Field(ge=1)
+
+    # Same boolean rejection as VerdictRequest: True must not mean k=1.
     @field_validator(
         "n_configs_viewed",
         mode="before",
@@ -304,3 +340,71 @@ def verdict(
     return asdict(
         result_verdict
     )
+
+
+# Sends the claim menu (app/claims.py) to React for the Claim Explorer.
+# Each claim maps an online claim to the factor Fluke actually tested.
+@app.get("/api/claims")
+def claims():
+    return [
+        asdict(claim)
+        for claim in list_claims()
+    ]
+
+
+# Several analyses at one shared k, for screens that show more than one
+# result (a factor across all periods, two factors side by side).
+# pass_below / fail_above are sent along so React never hard-codes a cutoff.
+@app.post("/api/batch")
+def batch(
+    request: BatchRequest,
+):
+    # Unique configs, in the order first seen. The same config twice on one
+    # screen is one result, so the response always lines up with `configs`
+    # whatever get_batch_analysis decides to do with duplicates.
+    configs = list(
+        dict.fromkeys(
+            (config.factor_key, config.period_key)
+            for config in request.configs
+        )
+    )
+
+    try:
+        pairs = get_batch_analysis(
+            configs,
+            request.n_configs_viewed,
+        )
+
+    # Deliberate: until Michael implements get_batch_analysis, the
+    # frontend gets a readable 501 instead of a 500, so BP can build
+    # against this route meanwhile.
+    except NotImplementedError as exc:
+        raise HTTPException(
+            status_code=501,
+            detail="get_batch_analysis is not implemented yet (Michael)",
+        ) from exc
+
+    except (
+        KeyError,
+        ValueError,
+        TypeError,
+    ) as exc:
+        analysis_error_to_http(exc)
+
+    return {
+        "k": request.n_configs_viewed,
+        "pass_below": PASS_BELOW,
+        "fail_above": FAIL_ABOVE,
+        "results": [
+            {
+                "factor_key": result.factor_key,
+                "period_key": period_key,
+                "analysis": analysis_to_dict(result),
+                "verdict": asdict(result_verdict),
+            }
+            for (_factor_key, period_key), (result, result_verdict) in zip(
+                configs,
+                pairs,
+            )
+        ],
+    }
