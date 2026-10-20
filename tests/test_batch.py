@@ -13,7 +13,6 @@ from app.api import ResultNotComputedError, get_analysis, get_batch_analysis, ve
 
 from test_api import fake_record, write
 
-pytestmark = pytest.mark.xfail(strict=True, raises=NotImplementedError, reason=">>> MICHAEL: remove this line once get_batch_analysis is implemented")
 
 CONFIGS = [
     ("momentum", "2020_2024"),

@@ -556,13 +556,21 @@ def get_batch_analysis(
     - ``k`` must be >= the number of UNIQUE configs in ``configs``
       (a screen cannot show more configurations than the session has
       counted); otherwise raise ValueError;
-    - keep ``configs`` in the order given; decide (and document in the
-      docstring) whether duplicates are dropped or rejected;
+    - keep ``configs`` in the order given; a config listed twice raises
+      ValueError (a duplicate means the caller built a bad request);
     - for each config: ``get_analysis(factor_key, period_key, k)`` then
       ``verdict_for(result, k)``;
     - let KeyError / ResultNotComputedError / ValueError / TypeError from
       those calls propagate unchanged (the HTTP layer maps them).
     """
-    # >>> MICHAEL: implement per the spec above. ~15 lines.
-    raise NotImplementedError("MICHAEL: get_batch_analysis")
-    # <<< MICHAEL
+    k = _check_k(k, "k")
+    if len(set(configs)) != len(configs):
+        raise ValueError(f"configs contains a duplicate: {configs!r}")
+    if len(configs) > k:
+        raise ValueError(f"k={k} is less than the {len(configs)} configs requested")
+    pairs = []
+    for factor_key, period_key in configs:
+        result = get_analysis(factor_key, period_key, k)
+        verdict = verdict_for(result, k)
+        pairs.append((result, verdict))
+    return pairs
