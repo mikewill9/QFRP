@@ -22,7 +22,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - High-precision rerun tooling: --config flag in run_permutations.py, compare_permutations.py, tests/test_run_permutations_cli.py
 - PROJECT_HANDOFF.md update (post-Checkpoint 11 section)
 - Pre-submission documentation cleanup and the README libraries list
-- Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. Every statistical function (get_batch_analysis), every claim mapping and description (app/claims.py), and every user-facing sentence were left as marked stubs and written by hand afterward: Michael (backend), BP (frontend). See SCAFFOLD_TODO.md.
+- Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. The statistical function get_batch_analysis, claim mappings and descriptions (app/claims.py), and user-facing sentences were initially left as marked stubs. Michael subsequently implemented get_batch_analysis. The frontend wording was later AI-drafted and applied with ChatGPT/Codex as documented below; the claim content remains unfinished. See SCAFFOLD_TODO.md.
 
 ## Drafted with Claude (chat), edited and approved by Michael
 
@@ -144,3 +144,20 @@ targeted AI guidance when issues arose.
   - Configured Render's PYTHON_VERSION and FRONTEND_ORIGIN settings.
   - Checked the deployed pages and reported the empty-dropdown issue
     for further troubleshooting.
+
+## Fluke v3 guide implementation — October 21, 2026
+
+At Bhavik's request, ChatGPT/Codex applied the AI-drafted replacement code
+from `Fluke_Complete_Guide_With_Code(2).md` to the uploaded fluke-v3
+project at commit 34442a5. This covered 13 frontend files and the evidence
+label mapping in analysisHelpers.js, completing the 34 BP text tasks.
+The UI wording in these changes is AI-drafted, not claimed as hand-written
+by Bhavik. Human review of the wording remains pending, including Michael's
+review of the five statistical-copy areas identified in SCAFFOLD_TODO.md.
+
+Codex compared the replacements with the existing source, installed
+dependencies in a separate test environment, and ran the frontend build,
+lint, existing Python tests, and checks against all 50 stored results.
+Michael's statistical calculations, precomputed data, and unfinished claim
+definitions were preserved. Detailed verification and release blockers are
+recorded in IMPLEMENTATION_STATUS.md.

@@ -7,20 +7,19 @@ function HomePage() {
   return (
     <div className="home-page page-width">
       <section className="hero">
-        {/* >>> BP: hero eyebrow, headline and intro. If a permutation count is shown anywhere, use analysis.n_permutations from the API rather than a hard-coded number. <<< */}
-        <div className="eyebrow">[BP: HERO EYEBROW]</div>
+        <div className="eyebrow">QUESTION THE BACKTEST</div>
 
-        <h1>[BP: headline: good backtest, or just good luck?]</h1>
+        <h1>A strong-looking strategy can still be a fluke.</h1>
 
-        <p className="hero-copy">[BP: two or three sentences: what Fluke is]</p>
+        <p className="hero-copy">Fluke helps you investigate supported investing claims by comparing historical strategy results with randomized alternatives, other time periods, trading costs, and known limitations.</p>
 
         <div className="hero-actions">
           <Link to="/claims" className="primary-button">
-            [BP: CTA: explore a claim]
+            Explore a claim
           </Link>
 
           <Link to="/compare" className="secondary-button">
-            [BP: CTA: open the comparison lab]
+            Open the Comparison Lab
           </Link>
         </div>
       </section>
@@ -29,40 +28,36 @@ function HomePage() {
         <article className="purpose-card">
           <span className="step-number">01</span>
 
-          {/* >>> BP: block 1, the problem <<< */}
-          <h2>[BP: heading: the problem]</h2>
+          <h2>A convincing chart is only the beginning</h2>
 
-          <p>[BP: two sentences: why a strong-looking backtest can be luck]</p>
+          <p>A historical chart can look persuasive even when chance helped produce the result. Repeated searching and a favorable time period can make a weak idea look strong.</p>
         </article>
 
         <article className="purpose-card">
           <span className="step-number">02</span>
 
-          {/* >>> BP: block 2, who it's for <<< */}
-          <h2>[BP: heading: who it's for]</h2>
+          <h2>For curious students and investment clubs</h2>
 
-          <p>[BP: two sentences: young investors, clubs, classrooms]</p>
+          <p>Fluke is for students and investment clubs who want to examine quantitative investing claims. You can explore the evidence without treating a backtest as a prediction.</p>
         </article>
 
         <article className="purpose-card">
           <span className="step-number">03</span>
 
-          {/* >>> BP: block 3, where to start <<< */}
-          <h2>[BP: heading: where to start]</h2>
+          <h2>Start with a question</h2>
 
-          <p>[BP: two sentences: start with a claim, then ask your own questions in the lab]</p>
+          <p>Choose a supported claim for a guided investigation. Then open the Comparison Lab to compare tested factors and ask your own questions.</p>
         </article>
       </section>
 
       <section className="why-section">
         <div>
-          {/* >>> BP: closing section eyebrow and heading <<< */}
-          <div className="eyebrow">[BP: WHY WE BUILT IT]</div>
+          <div className="eyebrow">LOOK PAST THE CHART</div>
 
-          <h2>[BP: one-line heading on the counter idea]</h2>
+          <h2>Does the evidence hold up when you challenge it?</h2>
         </div>
 
-        <p>[BP: two or three sentences: the more you look, the higher the bar]</p>
+        <p>The more configurations you inspect, the more chances you have to find an unusual result by luck. Fluke tracks unique factor-period combinations and adjusts the evidence for that search.</p>
       </section>
     </div>
   );

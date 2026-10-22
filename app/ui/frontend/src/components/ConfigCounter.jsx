@@ -22,22 +22,19 @@ function ConfigCounter({ k, passBelow, previousK = null }) {
 
         <strong className="config-counter-k">{k}</strong>
 
-        {/* >>> BP (Michael approves): counter copy; the three bracketed strings below <<< */}
         <span className="config-counter-unit">
-          [BP: unit label, e.g. configurations viewed]
+          configurations in this investigation
         </span>
       </div>
 
       <div className="config-counter-bar">
-        <span>[BP: short label for the current pass bar]</span>
+        <span>Raw p-value cutoff for positive evidence</span>
 
         <strong>{bar == null ? "N/A" : formatPValue(bar)}</strong>
       </div>
 
       <p className="config-counter-copy">
-        [BP (Michael approves): one or two sentences: you've looked at {k}{" "}
-        configs, so a result now needs raw p below{" "}
-        {bar == null ? "N/A" : formatPValue(bar)} to count]
+        This view accounts for {k} unique factor-period combinations. Looking at more configurations gives more chances to find an unusual result by luck, so positive evidence must clear a lower raw p-value cutoff.
       </p>
     </aside>
   );

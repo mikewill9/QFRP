@@ -46,7 +46,7 @@ function PeriodRow({ item, isFull }) {
   );
 }
 
-function PeriodConsistency({ results, passBelow }) {
+function PeriodConsistency({ results }) {
   const { full, parts } = splitFullPeriod(results);
   const k = results[0]?.analysis.k;
 
@@ -83,17 +83,13 @@ function PeriodConsistency({ results, passBelow }) {
       </div>
 
       {full && (
-        // >>> BP (Michael approves): one sentence: the full period overlaps the others so it is not an independent check
         <p className="period-full-note">
-          [BP (Michael approves): one sentence: the full period overlaps the
-          others so it is not an independent check]
+          The full period overlaps the shorter periods, so these are sensitivity checks, not independent confirmations.
         </p>
       )}
 
       <p className="period-k-note">
-        {/* >>> BP: one line: every row above is adjusted for the same k (interpolated); the pass bar itself is shown by ConfigCounter <<< */}
-        [BP: every row above is adjusted for the same {k} configurations
-        (pass bar: below {passBelow} before adjusting)]
+        Every row is adjusted for the same {k} configurations. The raw p-value cutoff is shown in the configuration counter.
       </p>
 
       <Plot

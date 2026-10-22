@@ -5,10 +5,8 @@ function SharedBanner({ k }) {
     <div className="shared-banner" role="note">
       <strong>{k}</strong>
 
-      {/* >>> BP (Michael approves): one sentence: this view is adjusted for the k configurations the sender had looked at, not yours <<< */}
       <p>
-        [BP (Michael approves): one sentence: this view is adjusted for the{" "}
-        {k} configurations the sender had looked at, not yours]
+        This shared view uses the adjustment for the {k} configurations in the sender&apos;s investigation. That is the sender&apos;s context, not your own browsing history.
       </p>
     </div>
   );

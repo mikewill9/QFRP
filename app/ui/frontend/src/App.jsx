@@ -38,8 +38,7 @@ function App() {
       <footer className="footer">
         <span>Fluke</span>
 
-        {/* >>> BP: footer line <<< */}
-        <span>[BP: research and education only, not investment advice]</span>
+        <span>Research and education only. Not investment advice.</span>
       </footer>
     </div>
   );
