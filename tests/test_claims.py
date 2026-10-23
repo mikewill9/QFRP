@@ -15,8 +15,6 @@ import pytest
 from app.api import list_factors, list_periods
 from app.claims import MATCH_LEVELS, Claim, list_claims
 
-pytestmark = pytest.mark.xfail(strict=True, raises=NotImplementedError, reason=">>> MICHAEL: remove once CLAIMS is written")
-
 
 def claim_strings(claim: Claim) -> list[str]:
     return [getattr(claim, field.name) for field in fields(Claim)]
