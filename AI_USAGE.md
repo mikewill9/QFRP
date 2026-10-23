@@ -23,6 +23,7 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - PROJECT_HANDOFF.md update (post-Checkpoint 11 section)
 - Pre-submission documentation cleanup and the README libraries list
 - Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. The statistical function get_batch_analysis, claim mappings and descriptions (app/claims.py), and user-facing sentences were initially left as marked stubs. Michael subsequently implemented get_batch_analysis. The frontend wording was later AI-drafted and applied with ChatGPT/Codex as documented below; the claim content remains unfinished. See SCAFFOLD_TODO.md.
+- app/claims.py: fixed typos and wording only; the survivorship sentence and all other claim text are Michael's
 
 ## Drafted with Claude (chat), edited and approved by Michael
 
