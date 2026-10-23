@@ -208,8 +208,7 @@ function CompareTab({ factors, periods, shared }) {
       </form>
 
       {sameFactor && (
-        // >>> BP: one line: pick two different factors
-        <p className="helper-text">[BP: one line: pick two different factors]</p>
+        <p className="helper-text">Choose two different factors to compare.</p>
       )}
 
       {isSharedView && result && <SharedBanner k={result.k} />}
@@ -254,23 +253,28 @@ function CompareTab({ factors, periods, shared }) {
           <section className="what-this-shows">
             <h3>What this shows</h3>
 
-            {/* >>> BP (Michael approves): two sentences (higher return, lower adjusted p) plus the fixed structural line; the sentences state facts, never that one factor "beat" the other <<< */}
             <p>
-              [BP (Michael approves): one sentence: {higherReturn.analysis.factor_label}{" "}
-              had the higher total return in {a.analysis.period_label} (
-              {formatPercent(higherReturn.analysis.total_return)})]
+              {!Number.isFinite(a.analysis.total_return) || !Number.isFinite(b.analysis.total_return) ? (
+                "A historical-return comparison is unavailable for these results."
+              ) : a.analysis.total_return === b.analysis.total_return ? (
+                <>Both factors had the same total return in {a.analysis.period_label}: {formatPercent(a.analysis.total_return)}.</>
+              ) : (
+                <>{higherReturn.analysis.factor_label} had the higher historical total return in {a.analysis.period_label}: {formatPercent(higherReturn.analysis.total_return)}.</>
+              )}
             </p>
 
             <p>
-              [BP (Michael approves): one sentence:{" "}
-              {lowerAdjustedP.analysis.factor_label} had the lower adjusted
-              p-value ({formatPValue(lowerAdjustedP.analysis.adjusted_p_value)})]
+              {!Number.isFinite(a.analysis.adjusted_p_value) || !Number.isFinite(b.analysis.adjusted_p_value) ? (
+                "An adjusted p-value comparison is unavailable for these results."
+              ) : a.analysis.adjusted_p_value === b.analysis.adjusted_p_value ? (
+                <>Both factors had the same adjusted p-value: {formatPValue(a.analysis.adjusted_p_value)}.</>
+              ) : (
+                <>{lowerAdjustedP.analysis.factor_label} had the lower adjusted p-value in its own test: {formatPValue(lowerAdjustedP.analysis.adjusted_p_value)}.</>
+              )}
             </p>
 
             <p className="structural-line">
-              [BP (Michael approves): one sentence, meaning fixed: each factor
-              is tested against its own random reshuffles; this is not a test
-              of which factor is better]
+              Each factor is tested against its own randomized null distribution. This is not a statistical test showing that one factor is better than the other.
             </p>
           </section>
 
@@ -289,7 +293,7 @@ function CompareTab({ factors, periods, shared }) {
           </div>
 
           <div className="share-card">
-            <h3>[BP: share heading]</h3>
+            <h3>Share this comparison</h3>
 
             <ShareLink url={shareUrl} />
           </div>
@@ -412,7 +416,7 @@ function PeriodsTab({ factors, periods, shared }) {
         </label>
 
         <button type="submit" className="primary-button" disabled={loading || !factorKey}>
-          [BP: run button: all five periods]
+          Check all periods
         </button>
       </form>
 
@@ -434,15 +438,14 @@ function PeriodsTab({ factors, periods, shared }) {
             <div className="card-heading">
               <h3>{result.results[0]?.analysis.factor_label}</h3>
 
-              {/* >>> BP: one sentence introducing the across-periods table <<< */}
-              <p>[BP: one sentence: the same factor, each period tested on its own]</p>
+              <p>Compare the same factor across the available periods, with each period tested against its own random reshuffles and every row using the same configuration count.</p>
             </div>
 
             <PeriodConsistency results={result.results} passBelow={result.passBelow} />
           </div>
 
           <div className="share-card">
-            <h3>[BP: share heading]</h3>
+            <h3>Share this period check</h3>
 
             <ShareLink url={shareUrl} />
           </div>
@@ -496,12 +499,11 @@ function ComparisonLabPage() {
     <div className="lab-page page-width">
       <section className="page-heading">
         <div>
-          {/* >>> BP: page eyebrow, title and intro line <<< */}
-          <div className="eyebrow">[BP: COMPARISON LAB EYEBROW]</div>
+          <div className="eyebrow">ASK YOUR OWN QUESTIONS</div>
 
-          <h1>[BP: page title]</h1>
+          <h1>Comparison Lab</h1>
 
-          <p>[BP: one line: ask your own questions and watch the bar move]</p>
+          <p>Compare historical results, inspect the evidence, and watch how exploring more configurations changes the adjustment.</p>
         </div>
       </section>
 

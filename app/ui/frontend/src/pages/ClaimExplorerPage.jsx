@@ -39,31 +39,29 @@ const STEPS = [
   "reflect",
 ];
 
-// >>> BP: one short title per step, shown in each step card's header
 const STEP_TITLES = {
-  choose: "[BP: step title: pick a claim]",
-  context: "[BP: step title: what Fluke tested]",
-  look: "[BP: step title: look at the result]",
-  predict: "[BP: step title: make a prediction]",
-  reveal: "[BP: step title: the randomization test]",
-  challenge: "[BP: step title: other periods]",
-  limits: "[BP: step title: costs and limits]",
-  reflect: "[BP: step title: reflect and share]",
+  choose: "Choose a question",
+  context: "Understand the test",
+  look: "Look at the result",
+  predict: "Make your prediction",
+  reveal: "Reveal the evidence",
+  challenge: "Challenge the result",
+  limits: "Check the limits",
+  reflect: "Reflect",
 };
 
 const PREDICTIONS = ["yes", "no", "not_sure"];
 const REFLECTIONS = ["more", "less", "same"];
 
-// >>> BP: the answer labels for the predict and reflect steps
 const PREDICTION_LABELS = {
-  yes: "[BP: Yes]",
-  no: "[BP: No]",
-  not_sure: "[BP: Not sure]",
+  yes: "Yes",
+  no: "No",
+  not_sure: "Not sure",
 };
 const REFLECTION_LABELS = {
-  more: "[BP: More]",
-  less: "[BP: Less]",
-  same: "[BP: About the same]",
+  more: "More",
+  less: "Less",
+  same: "About the same",
 };
 
 function StepCard({ step, children }) {
@@ -301,12 +299,11 @@ function ClaimExplorerPage() {
     <div className="claims-page page-width">
       <section className="page-heading">
         <div>
-          {/* >>> BP: page eyebrow, title and intro line <<< */}
-          <div className="eyebrow">[BP: CLAIM EXPLORER EYEBROW]</div>
+          <div className="eyebrow">FOLLOW THE EVIDENCE</div>
 
-          <h1>[BP: page title]</h1>
+          <h1>Claim Explorer</h1>
 
-          <p>[BP: one line: what this guided investigation does]</p>
+          <p>Choose a supported claim and investigate what the historical results can and cannot tell you.</p>
         </div>
       </section>
 
@@ -316,9 +313,7 @@ function ClaimExplorerPage() {
 
       {sharedClaimMissing && (
         <div className="error-banner">
-          {/* >>> BP: one line: this shared link points at a claim that no longer exists <<< */}
-          [BP: one line: this shared link points at a claim that no longer
-          exists; pick one below]
+          This shared link points to a claim that is no longer available. Choose a claim below to start a new investigation.
         </div>
       )}
 
@@ -326,8 +321,7 @@ function ClaimExplorerPage() {
 
       {step === "choose" && !sharedPending && (
         <StepCard step="choose">
-          {/* >>> BP: choose-step body copy <<< */}
-          <p className="step-copy">[BP: one or two sentences: pick a claim you have seen online]</p>
+          <p className="step-copy">Choose one of the supported claims below. Each card connects a question you might see online with a specific strategy Fluke can test.</p>
 
           {!menusLoaded && !menuError && <LoadingProgress />}
 
@@ -345,8 +339,7 @@ function ClaimExplorerPage() {
 
           <ClaimMatchNotice claim={claim} />
 
-          {/* >>> BP: context-step body copy <<< */}
-          <p className="step-copy">[BP: one or two sentences: here is what we will do next]</p>
+          <p className="step-copy">First, check how closely the tested strategy matches the claim. Next, inspect its historical results and make a prediction before revealing the statistical evidence.</p>
 
           <div className="step-actions">
             <button type="button" className="primary-button" onClick={startLook}>
@@ -354,7 +347,7 @@ function ClaimExplorerPage() {
             </button>
 
             <button type="button" className="secondary-button" onClick={restart}>
-              [BP: back to claims]
+              Back to claims
             </button>
           </div>
         </StepCard>
@@ -362,8 +355,7 @@ function ClaimExplorerPage() {
 
       {step === "look" && claim && (
         <StepCard step="look">
-          {/* >>> BP: look-step body copy (no verdict language here; the user has not predicted yet) <<< */}
-          <p className="step-copy">[BP: one or two sentences: here is the strategy's historical result; no verdict yet]</p>
+          <p className="step-copy">Look at the historical growth, total return, and largest decline. Consider what these results suggest and what questions you still have.</p>
 
           {loading && <LoadingProgress />}
 
@@ -403,7 +395,7 @@ function ClaimExplorerPage() {
                   className="primary-button"
                   onClick={() => setStep("predict")}
                 >
-                  [BP: continue]
+                  Make a prediction
                 </button>
               </div>
             </>
@@ -413,8 +405,7 @@ function ClaimExplorerPage() {
 
       {step === "predict" && (
         <StepCard step="predict">
-          {/* >>> BP: predict-step question and helper copy <<< */}
-          <p className="step-copy">[BP: the question: does this look convincing?]</p>
+          <p className="step-copy">Based on the historical result, do you think this strategy will show unusually strong evidence compared with random reshuffles?</p>
 
           <div className="choice-row" role="group" aria-label="Your prediction">
             {PREDICTIONS.map((answer) => (
@@ -433,7 +424,7 @@ function ClaimExplorerPage() {
           </div>
 
           <label className="note-field">
-            <span>[BP: optional note label, e.g. why?]</span>
+            <span>Why do you think so? (optional)</span>
 
             <textarea
               rows={3}
@@ -451,7 +442,7 @@ function ClaimExplorerPage() {
               disabled={!prediction.answer}
               onClick={() => setStep("reveal")}
             >
-              [BP: reveal the test]
+              Reveal the evidence
             </button>
           </div>
         </StepCard>
@@ -459,8 +450,7 @@ function ClaimExplorerPage() {
 
       {step === "reveal" && (
         <StepCard step="reveal">
-          {/* >>> BP: reveal-step body copy <<< */}
-          <p className="step-copy">[BP: one or two sentences: here is how the result compares with random reshuffles]</p>
+          <p className="step-copy">The test compares the observed gross Sharpe with random reshuffles of the same factor. The classification also accounts for how many unique configurations are included in this investigation.</p>
 
           {sharedPending && <LoadingProgress />}
 
@@ -473,13 +463,11 @@ function ClaimExplorerPage() {
               <div className="chart-card">
                 <div className="card-heading">
                   <h3>
-                    {/* >>> BP: histogram heading and one-sentence caption <<< */}
-                    [BP: histogram heading]
+                    Observed result versus random reshuffles
                   </h3>
 
                   <p>
-                    [BP: one sentence explaining what the histogram shows;{" "}
-                    {analysis.n_permutations.toLocaleString()} reshuffles]
+                    The histogram compares {analysis.n_permutations.toLocaleString()} random reshuffles with the observed gross Sharpe.
                   </p>
                 </div>
 
@@ -496,7 +484,7 @@ function ClaimExplorerPage() {
               <EvidenceSummary analysis={analysis} verdict={verdict} />
 
               <details className="test-details">
-                <summary>[BP: details toggle label]</summary>
+                <summary>View statistical details</summary>
 
                 <dl className="details-list">
                   <div>
@@ -534,7 +522,7 @@ function ClaimExplorerPage() {
                 </button>
 
                 <button type="button" className="secondary-button" onClick={restart}>
-                  [BP: start over]
+                  Start over
                 </button>
               </div>
             </>
@@ -544,8 +532,7 @@ function ClaimExplorerPage() {
 
       {step === "challenge" && (
         <StepCard step="challenge">
-          {/* >>> BP: challenge-step body copy: the counter just jumped <<< */}
-          <p className="step-copy">[BP: one or two sentences: you just looked at five configurations, watch the bar move]</p>
+          <p className="step-copy">Check the same factor across all available periods. Previously unseen factor-period combinations increase the count, and every row below uses the updated adjustment.</p>
 
           {loading && <LoadingProgress />}
 
@@ -570,7 +557,7 @@ function ClaimExplorerPage() {
                   className="primary-button"
                   onClick={() => setStep("limits")}
                 >
-                  [BP: continue]
+                  Check costs and limits
                 </button>
               </div>
             </>
@@ -580,14 +567,13 @@ function ClaimExplorerPage() {
 
       {step === "limits" && analysis && claim && (
         <StepCard step="limits">
-          {/* >>> BP: limits-step body copy <<< */}
-          <p className="step-copy">[BP: one or two sentences: what the test can still miss]</p>
+          <p className="step-copy">The result depends on the data and assumptions used in the test. Review trading costs and the limitations before deciding what the evidence means for the claim.</p>
 
           <div className="chart-card">
             <div className="card-heading">
-              <h3>[BP: cost table heading: historical cost sensitivity]</h3>
+              <h3>Historical cost sensitivity</h3>
 
-              <p>[BP: one sentence: 2x and 3x are what-ifs on the same history, not new verdicts]</p>
+              <p>The 2x and 3x cost scenarios are what-if checks on the same history; they do not produce new statistical verdicts.</p>
             </div>
 
             <div className="table-scroll">
@@ -614,7 +600,7 @@ function ClaimExplorerPage() {
           </div>
 
           <div className="limitations-card">
-            <h3>[BP: limitations heading]</h3>
+            <h3>Limitations of this test</h3>
 
             <ul>
               {analysis.limitations.map((limitation, index) => (
@@ -624,7 +610,7 @@ function ClaimExplorerPage() {
           </div>
 
           <div className="claim-gap-card">
-            <h3>[BP: heading: what this claim says that the test does not cover]</h3>
+            <h3>What the claim says that this test does not cover</h3>
 
             <p>{claim.what_it_does_not_test}</p>
           </div>
@@ -635,7 +621,7 @@ function ClaimExplorerPage() {
               className="primary-button"
               onClick={() => setStep("reflect")}
             >
-              [BP: continue]
+              Reflect on the evidence
             </button>
           </div>
         </StepCard>
@@ -643,8 +629,7 @@ function ClaimExplorerPage() {
 
       {step === "reflect" && claim && (
         <StepCard step="reflect">
-          {/* >>> BP: reflect-step body copy and the "you said X, now Y" sentence <<< */}
-          <p className="step-copy">[BP: the question: more or less convinced than before?]</p>
+          <p className="step-copy">After reviewing the evidence and limitations, are you more convinced, less convinced, or about as convinced by the claim as before?</p>
 
           <div className="choice-row" role="group" aria-label="Your reflection">
             {REFLECTIONS.map((answer) => (
@@ -664,9 +649,10 @@ function ClaimExplorerPage() {
 
           {reflection && (
             <p className="reflection-summary">
-              [BP: one sentence: you said{" "}
-              {PREDICTION_LABELS[prediction.answer] ?? "[BP: no prediction on a shared link]"}, now{" "}
-              {REFLECTION_LABELS[reflection]}]
+              {prediction.answer
+                ? `Your first answer was “${PREDICTION_LABELS[prediction.answer]}.” `
+                : "No prediction was recorded in this shared view. "}
+              Your confidence after reviewing the evidence: {REFLECTION_LABELS[reflection].toLowerCase()}.
             </p>
           )}
 
@@ -674,7 +660,7 @@ function ClaimExplorerPage() {
 
           {shareUrl && (
             <div className="share-card">
-              <h3>[BP: share heading]</h3>
+              <h3>Share this investigation</h3>
 
               <ShareLink url={shareUrl} />
             </div>
@@ -682,12 +668,11 @@ function ClaimExplorerPage() {
 
           <div className="step-actions">
             <Link to="/compare" className="primary-button">
-              [BP: one line handing off: now ask your own questions and watch
-              the bar]
+              Ask your own questions in the Comparison Lab
             </Link>
 
             <button type="button" className="secondary-button" onClick={restart}>
-              [BP: start over]
+              Start over
             </button>
           </div>
         </StepCard>

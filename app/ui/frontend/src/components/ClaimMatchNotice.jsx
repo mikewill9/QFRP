@@ -13,10 +13,8 @@ function ClaimMatchNotice({ claim }) {
         </span>
 
         {related && (
-          // >>> BP: one sentence: this is related evidence, not a test of the exact claim
           <p className="claim-match-warning">
-            [BP: one sentence: this is related evidence, not a test of the
-            exact claim]
+            This result is related to the claim, but it is not a test of the exact strategy as stated.
           </p>
         )}
       </div>

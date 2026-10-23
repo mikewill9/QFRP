@@ -90,12 +90,11 @@ export function fetchPeriods() {
   return apiFetch("/api/periods");
 }
 
-// >>> BP (Michael approves): the four user-facing labels. Keep four; INCONCLUSIVE must stay distinct from FAIL.
 export const EVIDENCE_LABELS = {
-  PASS: "[BP: label for PASS]",
-  INCONCLUSIVE: "[BP: label for INCONCLUSIVE]",
-  FAIL: "[BP: label for FAIL]",
-  FAIL_REVERSED: "[BP: label for FAIL when reversed === true]",
+  PASS: "Unusually strong under this test",
+  INCONCLUSIVE: "Inconclusive evidence",
+  FAIL: "No clear evidence of a positive signal",
+  FAIL_REVERSED: "Unusually weak under this test",
 };
 
 // One of the four EVIDENCE_LABELS keys, for styling and lookups.

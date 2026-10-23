@@ -7,6 +7,13 @@ const QUESTIONS = [
   "How many things did I look at before I found this?",
 ];
 
+const PROMPTS = [
+  "Compare the observed result with random reshuffles before treating it as evidence.",
+  "Check other periods, remembering that overlapping periods are not independent confirmations.",
+  "Review trading costs, data limitations, and the gap between the claim and the strategy tested.",
+  "Use the configuration count to account for the opportunities you had to find an unusual result.",
+];
+
 function Checklist() {
   return (
     <ol className="checklist">
@@ -17,8 +24,7 @@ function Checklist() {
           <div>
             <h4>{question}</h4>
 
-            {/* >>> BP: one sentence under each of the four fixed headings <<< */}
-            <p>[BP: one sentence]</p>
+            <p>{PROMPTS[index]}</p>
           </div>
         </li>
       ))}

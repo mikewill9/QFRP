@@ -1,30 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
-// >>> BP: one plain-English sentence per metric (titles are the metric names already used in the Analyzer)
 const DEFINITIONS = {
   sharpe: {
     title: "Sharpe ratio (1x costs)",
-    text: "[BP: one plain-English sentence]",
+    text: "Historical return relative to return variability, after the standard modeled trading costs.",
   },
   pValue: {
     title: "Raw p-value",
-    text: "[BP: one plain-English sentence]",
+    text: "How unusual the observed gross Sharpe is compared with random reshuffles; a smaller value gives more evidence in the positive direction under this test.",
   },
   adjustedP: {
     title: "Adjusted p-value",
-    text: "[BP: one plain-English sentence]",
+    text: "The raw p-value multiplied by the number of configurations examined, capped at 1, to account for multiple testing.",
   },
   drawdown: {
     title: "Max drawdown",
-    text: "[BP: one plain-English sentence]",
+    text: "The largest decline from a previous portfolio peak during the tested period.",
   },
   turnover: {
     title: "Turnover",
-    text: "[BP: one plain-English sentence]",
+    text: "How much the portfolio trades over time, shown here as a yearly multiple.",
   },
   totalReturn: {
     title: "Total return",
-    text: "[BP: one plain-English sentence]",
+    text: "The total gain or loss over the tested period after the standard modeled trading costs.",
   },
 };
 

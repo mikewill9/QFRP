@@ -37,14 +37,13 @@ function ShareLink({ url }) {
         aria-label="Shareable link"
       />
 
-      {/* >>> BP: the three button/status strings below <<< */}
       <button type="button" className="secondary-button" onClick={copy}>
-        {copied ? "[BP: copied state]" : "[BP: copy button label]"}
+        {copied ? "Link copied" : "Share evidence"}
       </button>
 
       {failed && (
         <span className="share-link-fallback">
-          [BP: one line: copying failed, select the link and copy it yourself]
+          Could not copy automatically. Select the displayed link and copy it.
         </span>
       )}
     </div>

@@ -26,8 +26,7 @@ function EvidenceSummary({ analysis, verdict }) {
       <div className="evidence-block">
         <h3>What we can't conclude</h3>
 
-        {/* >>> BP: one or two sentences on what a PASS/FAIL here does not tell you <<< */}
-        <p>[BP: one or two sentences on what this result cannot tell you]</p>
+        <p>This test does not show that the strategy will perform the same way in the future, prove that it is a better investment, or provide a buy or sell recommendation.</p>
       </div>
     </section>
   );
