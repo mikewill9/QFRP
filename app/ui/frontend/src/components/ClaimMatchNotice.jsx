@@ -9,12 +9,12 @@ function ClaimMatchNotice({ claim }) {
     >
       <div className="claim-match-header">
         <span className={`match-badge match-${claim.match_level}`}>
-          {claim.match_level}
+          {related ? "CLOSE, NOT EXACT" : claim.match_level}
         </span>
 
         {related && (
           <p className="claim-match-warning">
-            This result is related to the claim, but it is not a test of the exact strategy as stated.
+            Fluke tested a similar strategy, not the exact one in this claim. Here's the difference.
           </p>
         )}
       </div>

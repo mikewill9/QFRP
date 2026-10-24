@@ -11,7 +11,7 @@ function HomePage() {
 
         <h1>A strong-looking strategy can still be a fluke.</h1>
 
-        <p className="hero-copy">Fluke helps you investigate supported investing claims by comparing historical strategy results with randomized alternatives, other time periods, trading costs, and known limitations.</p>
+        <p className="hero-copy">Fluke checks whether a strategy's result is real or could just be luck. Fluke helps you investigate supported investing claims by comparing historical strategy results with randomized alternatives, other time periods, trading costs, and known limitations.</p>
 
         <div className="hero-actions">
           <Link to="/claims" className="primary-button">

@@ -21,6 +21,7 @@ import ConfigCounter from "../components/ConfigCounter.jsx";
 import DualEquityChart from "../components/DualEquityChart.jsx";
 import EvidenceSummary from "../components/EvidenceSummary.jsx";
 import LoadingProgress from "../components/LoadingProgress.jsx";
+import MetricHelp from "../components/MetricHelp.jsx";
 import PeriodConsistency from "../components/PeriodConsistency.jsx";
 import PermutationHistogram from "../components/PermutationHistogram.jsx";
 import ShareLink from "../components/ShareLink.jsx";
@@ -450,7 +451,7 @@ function ClaimExplorerPage() {
 
       {step === "reveal" && (
         <StepCard step="reveal">
-          <p className="step-copy">The test compares the observed gross Sharpe with random reshuffles of the same factor. The classification also accounts for how many unique configurations are included in this investigation.</p>
+          <p className="step-copy">Fluke checks whether a strategy's result is real or could just be luck. The test compares the observed gross Sharpe with random reshuffles of the same factor. The classification also accounts for how many unique configurations are included in this investigation.</p>
 
           {sharedPending && <LoadingProgress />}
 
@@ -488,13 +489,17 @@ function ClaimExplorerPage() {
 
                 <dl className="details-list">
                   <div>
-                    <dt>Raw p-value</dt>
+                    <dt>
+                      Raw p-value <MetricHelp metric="pValue" />
+                    </dt>
 
                     <dd>{formatPValue(verdict.raw_p_value)}</dd>
                   </div>
 
                   <div>
-                    <dt>Adjusted p-value</dt>
+                    <dt>
+                      Adjusted p-value <MetricHelp metric="adjustedP" />
+                    </dt>
 
                     <dd>{formatPValue(verdict.adjusted_p_value)}</dd>
                   </div>

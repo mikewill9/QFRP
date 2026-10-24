@@ -123,15 +123,17 @@ function PeriodConsistency({ results }) {
             color: "#374151",
           },
           showlegend: true,
+          dragmode: false,
           legend: { orientation: "h", x: 0, y: 1.15 },
-          xaxis: { title: "Period" },
+          xaxis: { title: "Period", fixedrange: true },
           yaxis: {
             title: "Sharpe (1x costs)",
             gridcolor: "#e5e7eb",
             zeroline: true,
+            fixedrange: true,
           },
         }}
-        config={{ displayModeBar: false, responsive: true }}
+        config={{ displayModeBar: false, responsive: true, scrollZoom: false }}
         useResizeHandler
         className="plot compact-plot"
       />

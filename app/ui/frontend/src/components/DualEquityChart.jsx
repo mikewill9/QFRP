@@ -29,12 +29,13 @@ function DualEquityChart({ a, b = null }) {
           color: "#374151",
         },
         hovermode: "x unified",
+        dragmode: false,
         showlegend: true,
         legend: { orientation: "h", x: 0, y: 1.12 },
-        yaxis: { title: "Growth of $1", gridcolor: "#e5e7eb" },
-        xaxis: { gridcolor: "#f3f4f6" },
+        yaxis: { title: "Growth of $1", gridcolor: "#e5e7eb", fixedrange: true },
+        xaxis: { gridcolor: "#f3f4f6", fixedrange: true },
       }}
-      config={{ displayModeBar: false, responsive: true }}
+      config={{ displayModeBar: false, responsive: true, scrollZoom: false }}
       useResizeHandler
       className="plot"
     />

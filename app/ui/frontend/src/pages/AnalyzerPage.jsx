@@ -352,16 +352,22 @@ function AnalyzerPage({ embedded = false }) {
                       title: "Growth of $1",
 
                       gridcolor: "#e5e7eb",
+
+                      fixedrange: true,
                     },
 
                     xaxis: {
                       gridcolor: "#f3f4f6",
+
+                      fixedrange: true,
                     },
                   })}
                   config={{
                     displayModeBar: false,
 
                     responsive: true,
+
+                    scrollZoom: false,
                   }}
                   useResizeHandler
                   className="plot"
@@ -443,6 +449,8 @@ function AnalyzerPage({ embedded = false }) {
                     layout={baseChartLayout({
                       xaxis: {
                         title: "Cost multiplier",
+
+                        fixedrange: true,
                       },
 
                       yaxis: {
@@ -451,12 +459,16 @@ function AnalyzerPage({ embedded = false }) {
                         gridcolor: "#e5e7eb",
 
                         zeroline: true,
+
+                        fixedrange: true,
                       },
                     })}
                     config={{
                       displayModeBar: false,
 
                       responsive: true,
+
+                      scrollZoom: false,
                     }}
                     useResizeHandler
                     className="plot compact-plot"
@@ -603,6 +615,8 @@ function baseChartLayout(overrides = {}) {
     },
 
     hovermode: "x unified",
+
+    dragmode: false,
 
     showlegend: true,
 

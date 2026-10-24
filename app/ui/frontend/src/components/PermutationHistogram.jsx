@@ -27,11 +27,13 @@ function PermutationHistogram({ result, formatNumber }) {
         xaxis: {
           title: "Gross Sharpe ratio",
           gridcolor: "#f3f4f6",
+          fixedrange: true,
         },
 
         yaxis: {
           title: "Count",
           gridcolor: "#e5e7eb",
+          fixedrange: true,
         },
 
         // Draw the real factor's gross Sharpe as a vertical line/
@@ -71,10 +73,13 @@ function PermutationHistogram({ result, formatNumber }) {
         plot_bgcolor: "#ffffff",
 
         showlegend: true,
+
+        dragmode: false,
       }}
       config={{
         displayModeBar: false,
         responsive: true,
+        scrollZoom: false,
       }}
       useResizeHandler
       className="plot"
