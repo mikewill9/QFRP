@@ -11,6 +11,12 @@ grow on for years: strict layering, small stable interfaces, deterministic
 offline operation, and a test suite that pins down the quantitative
 behavior of every component.
 
+## Fluke (the app)
+
+Live app: https://qfrp-frontend.vercel.app
+
+To run it locally, start the Python server (`uvicorn app.ui.server:app --port 8000`) and the website (`npm run dev` in `app/ui/frontend`), then open http://localhost:5173. Full steps are in [Running the app](#running-the-app).
+
 ## Design principles
 
 - **Correctness first.** No-lookahead is a structural property of the

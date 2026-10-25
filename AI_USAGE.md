@@ -10,6 +10,8 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - permute_within_date + tests
 - permutation_pvalue + tests
 - bonferroni_adjust + tests
+- get_batch_analysis in app/api.py (commit 34442a5)
+- Claim content in app/claims.py: every claim, mapping, match level and description (commit 1e82755)
 
 ## AI-assisted (Claude Code, reviewed by Michael)
 
@@ -22,9 +24,10 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - High-precision rerun tooling: --config flag in run_permutations.py, compare_permutations.py, tests/test_run_permutations_cli.py
 - PROJECT_HANDOFF.md update (post-Checkpoint 11 section)
 - Pre-submission documentation cleanup and the README libraries list
-- Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. The statistical function get_batch_analysis, claim mappings and descriptions (app/claims.py), and user-facing sentences were initially left as marked stubs. Michael subsequently implemented get_batch_analysis. The frontend wording was later AI-drafted and applied with ChatGPT/Codex as documented below; the claim content remains unfinished. See SCAFFOLD_TODO.md.
+- Fluke v3 scaffold (branch fluke-v3, the first commit after f7d3aa9 / origin/bp-frontend): component and page skeletons, routing, URL state, CSS, the /api/batch and /api/claims HTTP routes, structural tests and xfail test specs. The statistical function get_batch_analysis, claim mappings and descriptions (app/claims.py), and user-facing sentences were initially left as marked stubs. Michael subsequently implemented get_batch_analysis and wrote the claim content by hand (see Hand-written above). The frontend wording was later AI-drafted and applied with ChatGPT/Codex as documented below. See SCAFFOLD_TODO.md.
 - app/claims.py: fixed typos and wording only; the survivorship sentence and all other claim text are Michael's
-- User-test fixes (frontend): disabled Plotly zoom/pan, reworded the "related" claim badge and notice, added the "real or luck" intro sentence, and added MetricHelp to the reveal step's p-value labels (the new wording was supplied in the task, not written by Claude Code)
+- User-test fixes (frontend): disabled Plotly zoom/pan, reworded the "related" claim badge and notice, added the "real or luck" intro sentence, and added MetricHelp to the reveal step's p-value labels (the new wording was supplied in the task, not written by Claude Code; see "Drafted with Claude (chat), edited by us" below)
+- Pre-submission security check: scanned the repo and git history for secrets and personal info, audited npm and Python dependencies, and tested CORS and error responses (report only, no code changes); added the live link and a local-run line to README.md
 
 ## Drafted with Claude (chat), edited and approved by Michael
 
@@ -33,6 +36,12 @@ Michael wrote the core statistical functions by hand: the within-date shuffle, t
 - Planning and teamwork messages and outlines
 - docs/amihud_survivorship.md: outline and some wording drafted with Claude chat; data checks run, claims verified, and final text written by Michael
 - Running app directions in README.md
+
+## Drafted with Claude (chat), edited by us
+
+- Video script (first draft written by Claude Code from our outline)
+- CAC submission answers
+- User-test fix wording (the "CLOSE, NOT EXACT" badge and notice, the "real or luck" intro sentence)
 
 ## Methodology decisions (made by Michael after reviewing options with Claude)
 
