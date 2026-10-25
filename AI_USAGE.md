@@ -163,8 +163,9 @@ from `Fluke_Complete_Guide_With_Code(2).md` to the uploaded fluke-v3
 project at commit 34442a5. This covered 13 frontend files and the evidence
 label mapping in analysisHelpers.js, completing the 34 BP text tasks.
 The UI wording in these changes is AI-drafted, not claimed as hand-written
-by Bhavik. Human review of the wording remains pending, including Michael's
-review of the five statistical-copy areas identified in SCAFFOLD_TODO.md.
+by Bhavik. Human review of the wording is done (confirmed by Michael,
+October 25, 2026), including Michael's review of the five statistical-copy
+areas identified in SCAFFOLD_TODO.md.
 
 Codex compared the replacements with the existing source, installed
 dependencies in a separate test environment, and ran the frontend build,
