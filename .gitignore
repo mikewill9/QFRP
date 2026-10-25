@@ -37,3 +37,9 @@ Untitled*.ipynb
 
 # Frontend dependencies
 node_modules/
+
+# Local secrets and tool settings (.env.example stays tracked)
+.env
+.env.*
+!.env.example
+.claude/

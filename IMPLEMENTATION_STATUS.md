@@ -1,5 +1,12 @@
 # Fluke guide implementation
 
+> **Update, October 24, 2026.** This file records the October 21 guide
+> implementation. Since then: Michael wrote the real claims in app/claims.py
+> (the `example-claim` is gone), the xfail markers were removed, the test
+> suite is 586 passed with no expected failures, and fluke-v3 is pushed to
+> GitHub and live at https://qfrp-frontend.vercel.app. See "Pre-submission
+> items" below for the current status of each item.
+
 ## Completed
 
 Applied the 13 full frontend replacements and the EVIDENCE_LABELS block from
@@ -35,18 +42,19 @@ API wiring, and Advanced Analyzer source remain unchanged.
   Responses allow the existing https://qfrp-frontend.vercel.app origin.
 - Python test environment: 3.12.14. Node: 24.19.0.
 
-## Still required before final submission
+## Pre-submission items (status as of October 24, 2026)
 
-1. Michael must complete app/claims.py with verified real claims and mappings.
-   The existing `example-claim` is still present. The claim-flow UI is tested,
-   but its research content is not final.
-2. Remove the intentional xfail in tests/test_claims.py once that content is
-   finished, and rerun the tests.
-3. Review the AI-drafted copy, including Michael's five designated areas:
-   EVIDENCE_LABELS, ConfigCounter, PeriodConsistency's overlap note,
-   ComparisonLabPage's interpretation, and SharedBanner.
-4. Finish deployment and check the actual production pages against the new
-   backend. A successful local build is not a production deployment.
+1. Done: Michael wrote app/claims.py with six real claims and mappings
+   (commit 1e82755). The `example-claim` placeholder is gone.
+2. Done: tests/test_claims.py has no xfail marker; all 586 tests pass.
+3. Not recorded here: review of the AI-drafted copy, including Michael's five
+   designated areas (EVIDENCE_LABELS, ConfigCounter, PeriodConsistency's
+   overlap note, ComparisonLabPage's interpretation, and SharedBanner).
+   Michael and BP should confirm this review.
+4. Done: the live site https://qfrp-frontend.vercel.app serves the current
+   fluke-v3 frontend (including the user-test fixes), and the Render API at
+   https://qfrp.onrender.com answers with CORS limited to that site and
+   localhost.
 
 ## Hosting inspected during implementation
 
@@ -60,6 +68,8 @@ API wiring, and Advanced Analyzer source remain unchanged.
 - GitHub writes were rejected by the connected integration (403). Local Git
   push also requires authentication. Frontend implementation is committed
   locally as 8456b52; it has NOT been pushed to GitHub or deployed to Vercel.
+  (Superseded: fluke-v3 has since been pushed and deployed; see the update
+  at the top of this file.)
 - No replacement project or paid service has been created.
 - Revealing masked Render environment settings was rejected by automatic
   approval review. Existing values were preserved; no secrets were revealed.

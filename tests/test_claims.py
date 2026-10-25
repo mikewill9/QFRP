@@ -1,10 +1,7 @@
 """Structural tests for app.claims.list_claims().
 
-They check Michael's finished CLAIMS, so they cannot pass while the
-placeholder example claim is still in place: ``written_claims`` raises
-NotImplementedError until every ``[MICHAEL`` string is gone. With
-xfail(strict) the module flips to XPASS(strict) failures the moment the
-claims are written, which is the signal to delete the ``pytestmark`` line.
+They check Michael's finished CLAIMS: ``written_claims`` raises
+NotImplementedError if any ``[MICHAEL`` placeholder string comes back.
 """
 
 from __future__ import annotations

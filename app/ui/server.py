@@ -217,10 +217,11 @@ def analysis_error_to_http(exc):
 
     # A normal KeyError means the factor or period does not exist,
     # or the factor is intentionally excluded.
+    # str() of a KeyError adds extra quotes, so send the message itself.
     if isinstance(exc, KeyError):
         raise HTTPException(
             status_code=404,
-            detail=str(exc),
+            detail=str(exc.args[0]) if exc.args else str(exc),
         ) from exc
 
     # The contract says an invalid value of k should return 422.

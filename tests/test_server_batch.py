@@ -81,7 +81,10 @@ def test_batch_maps_analysis_errors(monkeypatch):
         raise KeyError("unknown factor_key 'nope'")
 
     monkeypatch.setattr(server, "get_batch_analysis", unknown)
-    assert client.post("/api/batch", json=VALID_BODY).status_code == 404
+    response = client.post("/api/batch", json=VALID_BODY)
+    assert response.status_code == 404
+    # The message itself, not str(KeyError) with an extra layer of quotes.
+    assert response.json()["detail"] == "unknown factor_key 'nope'"
 
     def too_few(configs, k):
         raise ValueError("k must be >= the number of unique configs")

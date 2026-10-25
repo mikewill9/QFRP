@@ -1,9 +1,8 @@
 """Tests for app.api.get_batch_analysis against small fake results files.
 
 Same fixture pattern as tests/test_api.py (fake_record / results_dir).
-Every test is xfail(strict) until Michael implements the function: the
-moment it works, pytest reports XPASS(strict) as a failure, which is the
-signal to delete the ``pytestmark`` line below.
+These started as xfail(strict) specs; Michael implemented the function
+and the xfail marker was removed.
 """
 
 from __future__ import annotations

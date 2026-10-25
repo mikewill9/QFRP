@@ -235,7 +235,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173 and click **Open the analyzer**. Leave both terminals running while you use the app.
+Then open http://localhost:5173 and click **Explore a claim** or **Open the Comparison Lab**. Leave both terminals running while you use the app.
 
 ## Permutation test results
 
