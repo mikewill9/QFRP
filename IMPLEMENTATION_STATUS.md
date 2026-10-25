@@ -47,10 +47,10 @@ API wiring, and Advanced Analyzer source remain unchanged.
 1. Done: Michael wrote app/claims.py with six real claims and mappings
    (commit 1e82755). The `example-claim` placeholder is gone.
 2. Done: tests/test_claims.py has no xfail marker; all 586 tests pass.
-3. Not recorded here: review of the AI-drafted copy, including Michael's five
-   designated areas (EVIDENCE_LABELS, ConfigCounter, PeriodConsistency's
-   overlap note, ComparisonLabPage's interpretation, and SharedBanner).
-   Michael and BP should confirm this review.
+3. Done (confirmed by Michael, October 25, 2026): review of the AI-drafted
+   copy, including Michael's five designated areas (EVIDENCE_LABELS,
+   ConfigCounter, PeriodConsistency's overlap note, ComparisonLabPage's
+   interpretation, and SharedBanner).
 4. Done: the live site https://qfrp-frontend.vercel.app serves the current
    fluke-v3 frontend (including the user-test fixes), and the Render API at
    https://qfrp.onrender.com answers with CORS limited to that site and
